@@ -1,49 +1,49 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import {
-  getAuth,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
+import { 
+  getAuth, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged 
 } from "firebase/auth";
-import {
-  getFirestore,
-  doc,
-  setDoc,
-  getDoc,
-  onSnapshot,
-  collection,
-  addDoc,
-  updateDoc,
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  onSnapshot, 
+  collection, 
+  addDoc, 
+  updateDoc, 
   increment,
   writeBatch,
-  deleteDoc,
+  deleteDoc
 } from "firebase/firestore";
-import {
-  BookOpen,
-  Layers,
-  User,
-  Home,
-  Check,
-  X,
-  Zap,
-  ChevronRight,
-  Search,
-  Volume2,
-  Puzzle,
-  MessageSquare,
-  GraduationCap,
-  PlusCircle,
-  Save,
-  Feather,
-  ChevronDown,
-  PlayCircle,
-  Award,
-  Trash2,
-  Plus,
-  FileText,
+import { 
+  BookOpen, 
+  Layers, 
+  User, 
+  Home, 
+  Check, 
+  X, 
+  Zap, 
+  ChevronRight, 
+  Search, 
+  Volume2, 
+  Puzzle, 
+  MessageSquare, 
+  GraduationCap, 
+  PlusCircle, 
+  Save, 
+  Feather, 
+  ChevronDown, 
+  PlayCircle, 
+  Award, 
+  Trash2, 
+  Plus, 
+  FileText, 
   Brain,
   Loader,
   LogOut,
@@ -53,11 +53,10 @@ import {
   Database,
   School,
   Users,
-  Library,
-  Copy,
-} from "lucide-react";
+  Copy
+} from 'lucide-react';
 
-// --- FIREBASE CONFIGURATION ---
+// --- FIREBASE CONFIGURATION (EPIC LATIN) ---
 const firebaseConfig = {
   apiKey: "AIzaSyAjK79x_N5pSWzWluFUg25mqEc_HeraRPk",
   authDomain: "epic-latin.firebaseapp.com",
@@ -65,7 +64,7 @@ const firebaseConfig = {
   storageBucket: "epic-latin.firebasestorage.app",
   messagingSenderId: "321050459278",
   appId: "1:321050459278:web:df00b3cf5b8befb0d55ddf",
-  measurementId: "G-KEWLZ67Z61",
+  measurementId: "G-KEWLZ67Z61"
 };
 
 // Initialize Firebase
@@ -73,7 +72,7 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = "epic-latin-prod";
+const appId = 'epic-latin-prod'; 
 
 // --- CONSTANTS & DEFAULTS ---
 
@@ -83,238 +82,83 @@ const DEFAULT_USER_DATA = {
   level: "Novice",
   streak: 1,
   xp: 0,
-  role: "student", // 'student' or 'instructor'
+  role: 'student' 
 };
 
 // --- INITIAL SEED DATA ---
 const INITIAL_SYSTEM_DECKS = {
   salutationes: {
-    title: "👋 Salutationes (Greetings)",
+    title: "👋 Salutationes",
     cards: [
-      {
-        id: "s1",
-        front: "Salve",
-        back: "Hello (Singular)",
-        ipa: "/ˈsal.weː/",
-        type: "phrase",
-        mastery: 4,
-        morphology: [
-          { part: "Salv-", meaning: "Health/Safe", type: "root" },
-          { part: "-e", meaning: "Imperative Sing.", type: "suffix" },
-        ],
-        usage: { sentence: "Salve, Marce!", translation: "Hello, Marcus!" },
-        grammar_tags: ["Imperative", "Greeting"],
-      },
-      {
-        id: "s2",
-        front: "Salvete",
-        back: "Hello (Plural)",
-        ipa: "/salˈweː.te/",
-        type: "phrase",
-        mastery: 3,
-        morphology: [
-          { part: "Salv-", meaning: "Health", type: "root" },
-          { part: "-ete", meaning: "Imperative Pl.", type: "suffix" },
-        ],
-        usage: {
-          sentence: "Salvete, discipuli!",
-          translation: "Hello, students!",
-        },
-        grammar_tags: ["Imperative", "Greeting"],
-      },
-      {
-        id: "s3",
-        front: "Vale",
-        back: "Goodbye",
-        ipa: "/ˈwa.leː/",
-        type: "phrase",
-        mastery: 3,
-        morphology: [
-          { part: "Val-", meaning: "Be strong", type: "root" },
-          { part: "-e", meaning: "Imperative", type: "suffix" },
-        ],
-        usage: { sentence: "Vale, amice.", translation: "Goodbye, friend." },
-        grammar_tags: ["Valediction"],
-      },
-    ],
+      { id: 's1', front: "Salve", back: "Hello (Singular)", ipa: "/ˈsal.weː/", type: "phrase", mastery: 4, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-e", meaning: "Imp. Sing.", type: "suffix" }], usage: { sentence: "Salve, Marce!", translation: "Hello, Marcus!" }, grammar_tags: ["Imperative", "Greeting"] },
+      { id: 's2', front: "Salvete", back: "Hello (Plural)", ipa: "/salˈweː.te/", type: "phrase", mastery: 3, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-ete", meaning: "Imp. Pl.", type: "suffix" }], usage: { sentence: "Salvete, discipuli!", translation: "Hello, students!" }, grammar_tags: ["Imperative", "Greeting"] },
+      { id: 's3', front: "Vale", back: "Goodbye", ipa: "/ˈwa.leː/", type: "phrase", mastery: 3, morphology: [{ part: "Val-", meaning: "Be strong", type: "root" }, { part: "-e", meaning: "Imp.", type: "suffix" }], usage: { sentence: "Vale, amice.", translation: "Goodbye, friend." }, grammar_tags: ["Valediction"] }
+    ]
   },
   medicina: {
-    title: "⚕️ Medicina (Medicine)",
+    title: "⚕️ Medicina",
     cards: [
-      {
-        id: "m1",
-        front: "Vulnus",
-        back: "Wound",
-        ipa: "/ˈwul.nus/",
-        type: "noun",
-        mastery: 1,
-        morphology: [
-          { part: "Vuln-", meaning: "Wound", type: "root" },
-          { part: "-us", meaning: "Neut. Nom.", type: "suffix" },
-        ],
-        usage: {
-          sentence: "Vulnus grave est.",
-          translation: "The wound is serious.",
-        },
-        grammar_tags: ["3rd Declension", "Medical"],
-      },
-      {
-        id: "m2",
-        front: "Curare",
-        back: "To cure",
-        ipa: "/kuˈraː.re/",
-        type: "verb",
-        mastery: 2,
-        morphology: [
-          { part: "Cur-", meaning: "Care", type: "root" },
-          { part: "-are", meaning: "Inf.", type: "suffix" },
-        ],
-        usage: { sentence: "Medicus curat.", translation: "The doctor cures." },
-        grammar_tags: ["1st Conjugation"],
-      },
-    ],
+      { id: 'm1', front: "Vulnus", back: "Wound", ipa: "/ˈwul.nus/", type: "noun", mastery: 1, morphology: [{ part: "Vuln-", meaning: "Wound", type: "root" }, { part: "-us", meaning: "Nom.", type: "suffix" }], usage: { sentence: "Vulnus grave est.", translation: "The wound is serious." }, grammar_tags: ["3rd Declension"] },
+      { id: 'm2', front: "Curare", back: "To cure", ipa: "/kuˈraː.re/", type: "verb", mastery: 2, morphology: [{ part: "Cur-", meaning: "Care", type: "root" }, { part: "-are", meaning: "Inf.", type: "suffix" }], usage: { sentence: "Medicus curat.", translation: "The doctor cures." }, grammar_tags: ["1st Conjugation"] }
+    ]
   },
   bellum: {
-    title: "⚔️ Bellum (War)",
+    title: "⚔️ Bellum",
     cards: [
-      {
-        id: "b1",
-        front: "Bellum",
-        back: "War",
-        ipa: "/ˈbel.lum/",
-        type: "noun",
-        mastery: 4,
-        morphology: [
-          { part: "Bell-", meaning: "War", type: "root" },
-          { part: "-um", meaning: "Neut.", type: "suffix" },
-        ],
-        usage: { sentence: "Para bellum.", translation: "Prepare for war." },
-        grammar_tags: ["2nd Declension"],
-      },
-      {
-        id: "b2",
-        front: "Gladius",
-        back: "Sword",
-        ipa: "/ˈɡla.di.us/",
-        type: "noun",
-        mastery: 2,
-        morphology: [
-          { part: "Gladi-", meaning: "Sword", type: "root" },
-          { part: "-us", meaning: "Masc.", type: "suffix" },
-        ],
-        usage: { sentence: "Gladius ferreus.", translation: "Iron sword." },
-        grammar_tags: ["2nd Declension"],
-      },
-    ],
+      { id: 'b1', front: "Bellum", back: "War", ipa: "/ˈbel.lum/", type: "noun", mastery: 4, morphology: [{ part: "Bell-", meaning: "War", type: "root" }, { part: "-um", meaning: "Neut.", type: "suffix" }], usage: { sentence: "Para bellum.", translation: "Prepare for war." }, grammar_tags: ["2nd Declension"] },
+      { id: 'b2', front: "Gladius", back: "Sword", ipa: "/ˈɡla.di.us/", type: "noun", mastery: 2, morphology: [{ part: "Gladi-", meaning: "Sword", type: "root" }, { part: "-us", meaning: "Masc.", type: "suffix" }], usage: { sentence: "Gladius ferreus.", translation: "Iron sword." }, grammar_tags: ["2nd Declension"] }
+    ]
   },
   mare: {
-    title: "🌊 Mare (The Sea)",
+    title: "🌊 Mare",
     cards: [
-      {
-        id: "sea1",
-        front: "Navis",
-        back: "Ship",
-        ipa: "/ˈnaː.wis/",
-        type: "noun",
-        mastery: 2,
-        morphology: [
-          { part: "Nav-", meaning: "Ship", type: "root" },
-          { part: "-is", meaning: "Fem.", type: "suffix" },
-        ],
-        usage: { sentence: "Navis navigat.", translation: "The ship sails." },
-        grammar_tags: ["3rd Declension"],
-      },
-    ],
+      { id: 'sea1', front: "Navis", back: "Ship", ipa: "/ˈnaː.wis/", type: "noun", mastery: 2, morphology: [{ part: "Nav-", meaning: "Ship", type: "root" }, { part: "-is", meaning: "Fem.", type: "suffix" }], usage: { sentence: "Navis navigat.", translation: "The ship sails." }, grammar_tags: ["3rd Declension"] }
+    ]
   },
   iter: {
-    title: "🗺️ Iter (Travel)",
+    title: "🗺️ Iter",
     cards: [
-      {
-        id: "i1",
-        front: "Iter",
-        back: "Journey",
-        ipa: "/ˈi.ter/",
-        type: "noun",
-        mastery: 2,
-        morphology: [
-          { part: "I-", meaning: "Go", type: "root" },
-          { part: "-ter", meaning: "Suffix", type: "suffix" },
-        ],
-        usage: { sentence: "Iter longum.", translation: "Long journey." },
-        grammar_tags: ["3rd Declension"],
-      },
-    ],
-  },
+      { id: 'i1', front: "Iter", back: "Journey", ipa: "/ˈi.ter/", type: "noun", mastery: 2, morphology: [{ part: "I-", meaning: "Go", type: "root" }, { part: "-ter", meaning: "Suffix", type: "suffix" }], usage: { sentence: "Iter longum.", translation: "Long journey." }, grammar_tags: ["3rd Declension"] }
+    ]
+  }
 };
 
 const INITIAL_SYSTEM_LESSONS = [
   {
-    id: "l1",
+    id: 'l1',
     title: "Salutationes",
     subtitle: "Greetings in the Forum",
     description: "Learn how to greet friends and elders in the Roman Forum.",
     xp: 50,
-    vocab: ["Salve", "Vale", "Quid agis?"],
+    vocab: ['Salve', 'Vale', 'Quid agis?'],
     dialogue: [
-      {
-        speaker: "Marcus",
-        text: "Salve, Iulia!",
-        translation: "Hello, Julia!",
-        side: "left",
-      },
-      {
-        speaker: "Iulia",
-        text: "Salve, Marce. Quid agis?",
-        translation: "Hello, Marcus. How are you?",
-        side: "right",
-      },
-      {
-        speaker: "Marcus",
-        text: "Bene sum.",
-        translation: "I am well.",
-        side: "left",
-      },
+      { speaker: "Marcus", text: "Salve, Iulia!", translation: "Hello, Julia!", side: "left" },
+      { speaker: "Iulia", text: "Salve, Marce. Quid agis?", translation: "Hello, Marcus. How are you?", side: "right" },
+      { speaker: "Marcus", text: "Bene sum.", translation: "I am well.", side: "left" }
     ],
     quiz: {
       question: "How do you say 'Hello' to a group?",
-      options: [
-        { id: "a", text: "Salve" },
-        { id: "b", text: "Salvete" },
-        { id: "c", text: "Vale" },
-      ],
-      correctId: "b",
-    },
-  },
+      options: [{ id: 'a', text: "Salve" }, { id: 'b', text: "Salvete" }, { id: 'c', text: "Vale" }],
+      correctId: 'b'
+    }
+  }
 ];
 
 const TYPE_COLORS = {
-  verb: { bg: "bg-rose-50", border: "border-rose-200", text: "text-rose-700" },
-  noun: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
-  adverb: {
-    bg: "bg-amber-50",
-    border: "border-amber-200",
-    text: "text-amber-700",
-  },
-  phrase: {
-    bg: "bg-purple-50",
-    border: "border-purple-200",
-    text: "text-purple-700",
-  },
-  adjective: {
-    bg: "bg-emerald-50",
-    border: "border-emerald-200",
-    text: "text-emerald-700",
-  },
+  verb: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700' },
+  noun: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
+  adverb: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
+  phrase: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
 };
 
 // --- COMPONENTS ---
 
 const Navigation = ({ activeTab, setActiveTab }) => {
   const tabs = [
-    { id: "home", icon: Home, label: "Domus" },
-    { id: "flashcards", icon: Layers, label: "Chartae" },
-    { id: "teach", icon: School, label: "Magister" }, // Instructor Tab
-    { id: "profile", icon: User, label: "Ego" },
+    { id: 'home', icon: Home, label: 'Domus' },
+    { id: 'flashcards', icon: Layers, label: 'Chartae' },
+    { id: 'teach', icon: School, label: 'Magister' }, 
+    { id: 'profile', icon: User, label: 'Ego' },
   ];
 
   return (
@@ -324,15 +168,11 @@ const Navigation = ({ activeTab, setActiveTab }) => {
           key={tab.id}
           onClick={() => setActiveTab(tab.id)}
           className={`flex flex-col items-center space-y-1 transition-all duration-200 ${
-            activeTab === tab.id
-              ? "text-indigo-600 scale-105"
-              : "text-slate-400"
+            activeTab === tab.id ? 'text-indigo-600 scale-105' : 'text-slate-400'
           }`}
         >
           <tab.icon size={24} strokeWidth={activeTab === tab.id ? 2.5 : 2} />
-          <span className="text-[10px] font-bold tracking-wide uppercase">
-            {tab.label}
-          </span>
+          <span className="text-[10px] font-bold tracking-wide uppercase">{tab.label}</span>
         </button>
       ))}
     </div>
@@ -341,45 +181,185 @@ const Navigation = ({ activeTab, setActiveTab }) => {
 
 const Header = ({ title, subtitle, rightAction, onClickTitle }) => (
   <div className="px-6 pt-12 pb-6 bg-white sticky top-0 z-40 border-b border-slate-100 flex justify-between items-end">
-    <div
-      onClick={onClickTitle}
-      className={
-        onClickTitle
-          ? "cursor-pointer active:opacity-60 transition-opacity"
-          : ""
-      }
-    >
+    <div onClick={onClickTitle} className={onClickTitle ? "cursor-pointer active:opacity-60 transition-opacity" : ""}>
       <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-        {title}{" "}
-        {onClickTitle && <ChevronDown size={20} className="text-slate-400" />}
+        {title} {onClickTitle && <ChevronDown size={20} className="text-slate-400" />}
       </h1>
-      {subtitle && (
-        <p className="text-sm text-slate-500 mt-1 font-medium">{subtitle}</p>
-      )}
+      {subtitle && <p className="text-sm text-slate-500 mt-1 font-medium">{subtitle}</p>}
     </div>
     {rightAction}
   </div>
 );
 
-// --- INSTRUCTOR (MAGISTER) VIEWS ---
-
+// --- INSTRUCTOR (MAGISTER) VIEW ---
 const InstructorView = ({ user, allDecks, onSaveLesson, onSaveCard }) => {
-  const [subTab, setSubTab] = useState("classes"); // classes, library
+  const [subTab, setSubTab] = useState('classes');
   const [classes, setClasses] = useState([]);
-  const [newClassName, setNewClassName] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [newClassName, setNewClassName] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Listener for Instructor Classes
   useEffect(() => {
-    const q = collection(db, "artifacts", appId, "users", user.uid, "classes");
+    const q = collection(db, 'artifacts', appId, 'users', user.uid, 'classes');
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setClasses(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      setClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubscribe();
   }, [user]);
 
   const handleCreateClass = async (e) => {
     e.preventDefault();
+    if (!newClassName.trim()) return;
+    const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), {
+      name: newClassName, code: joinCode, students: 0, created: Date.now()
+    });
+    setNewClassName('');
+  };
+
+  const handleDeleteClass = async (id) => {
+    if (window.confirm("Delete this class?")) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id));
+    }
+  };
+
+  const allCards = Object.values(allDecks).flatMap(deck => deck.cards || []);
+  const filteredCards = allCards.filter(c => 
+    c.front.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    c.back.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="h-full flex flex-col bg-slate-50">
+      <Header title="Magister" subtitle="Instructor Dashboard" />
+      <div className="px-6 mt-2">
+        <div className="flex bg-slate-200 p-1 rounded-xl">
+           <button onClick={() => setSubTab('classes')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'classes' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Classes</button>
+           <button onClick={() => setSubTab('library')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'library' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Library</button>
+           <button onClick={() => setSubTab('builder')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'builder' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Builder</button>
+        </div>
+      </div>
+      <div className="flex-1 px-6 mt-4 overflow-y-auto custom-scrollbar pb-24">
+        {subTab === 'classes' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <form onSubmit={handleCreateClass} className="flex gap-2">
+              <input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="flex-1 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500" />
+              <button type="submit" className="bg-indigo-600 text-white p-3 rounded-xl"><Plus /></button>
+            </form>
+            <div className="space-y-3">
+              {classes.map(cls => (
+                <div key={cls.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div><h3 className="font-bold text-lg text-slate-900">{cls.name}</h3><div className="flex items-center gap-2 mt-1"><span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-mono tracking-wider flex items-center gap-1">{cls.code} <Copy size={10} className="cursor-pointer" onClick={() => navigator.clipboard.writeText(cls.code)}/></span><span className="text-xs text-slate-400 flex items-center gap-1"><Users size={12} /> {cls.students} Students</span></div></div>
+                    <button onClick={() => handleDeleteClass(cls.id)} className="text-slate-300 hover:text-rose-500"><Trash2 size={18}/></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {subTab === 'library' && (
+          <div className="space-y-4 animate-in fade-in duration-300">
+            <div className="relative"><Search className="absolute left-3 top-3.5 text-slate-400" size={20} /><input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search cards..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              {filteredCards.slice(0, 10).map((card, idx) => (
+                <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm"><p className="font-bold text-slate-800">{card.front}</p><p className="text-xs text-slate-500">{card.back}</p></div>
+              ))}
+            </div>
+          </div>
+        )}
+        {subTab === 'builder' && (
+          <div className="animate-in fade-in duration-300">
+             <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800"><p className="font-bold flex items-center gap-2"><Brain size={16}/> Instructor Mode</p></div>
+             <LessonBuilderView onSave={(l) => { onSaveLesson(l); alert("Lesson Saved"); }} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// --- AUTH VIEW ---
+const AuthView = () => {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      if (isLogin) {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
+          ...DEFAULT_USER_DATA, name: name || "Discipulus", email: user.email
+        });
+      }
+    } catch (err) { setError(err.message.replace('Firebase: ', '')); } 
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="h-full flex flex-col p-6 bg-slate-50">
+      <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
+        <div className="text-center mb-8"><div className="w-20 h-20 bg-indigo-600 rounded-3xl mx-auto flex items-center justify-center text-white mb-4 shadow-xl shadow-indigo-200"><GraduationCap size={40} /></div><h1 className="text-3xl font-bold text-slate-900">LinguistFlow</h1><p className="text-slate-500 mt-2">Master Latin with depth & context.</p></div>
+        <form onSubmit={handleAuth} className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {!isLogin && <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Name</label><div className="relative"><User className="absolute left-3 top-3.5 text-slate-400" size={20} /><input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Marcus Aurelius" required={!isLogin} /></div></div>}
+          <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Email</label><div className="relative"><Mail className="absolute left-3 top-3.5 text-slate-400" size={20} /><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="marcus@rome.com" required /></div></div>
+          <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Password</label><div className="relative"><Lock className="absolute left-3 top-3.5 text-slate-400" size={20} /><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="••••••••" required /></div></div>
+          {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm rounded-lg border border-rose-100">{error}</div>}
+          <button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">{loading ? <Loader className="animate-spin" /> : (isLogin ? "Sign In" : "Create Account")}</button>
+        </form>
+        <div className="mt-6 text-center"><button onClick={() => { setIsLogin(!isLogin); setError(''); }} className="text-indigo-600 font-bold text-sm hover:underline">{isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}</button></div>
+      </div>
+    </div>
+  );
+};
+
+// --- PROFILE VIEW ---
+const ProfileView = ({ user, userData }) => {
+  const [deploying, setDeploying] = useState(false);
+  const handleLogout = () => signOut(auth);
+
+  const deploySystemContent = async () => {
+    setDeploying(true);
+    const batch = writeBatch(db);
+    Object.entries(INITIAL_SYSTEM_DECKS).forEach(([key, deck]) => { batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_decks', key), deck); });
+    INITIAL_SYSTEM_LESSONS.forEach((lesson) => { batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_lessons', lesson.id), lesson); });
+    try { await batch.commit(); alert("System Content Deployed!"); } catch (e) { alert("Error: " + e.message); }
+    setDeploying(false);
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-slate-50">
+      <Header title="Ego" subtitle="Profile & Settings" />
+      <div className="flex-1 px-6 mt-4 overflow-y-auto">
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center mb-6"><div className="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 mb-4 text-3xl font-bold">{userData?.name?.charAt(0) || "D"}</div><h2 className="text-2xl font-bold text-slate-900">{userData?.name}</h2><p className="text-slate-500 text-sm flex items-center gap-1 mt-1"><Mail size={14} /> {user.email}</p><div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase tracking-wider">{userData?.level || "Novice"}</div></div>
+        <div className="space-y-3">
+          <h3 className="font-bold text-slate-900 text-sm ml-1">Account</h3>
+          <button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border border-slate-200 text-rose-600 font-bold flex items-center justify-between active:bg-rose-50 transition-colors"><span>Sign Out</span><LogOut size={20} /></button>
+          <h3 className="font-bold text-slate-900 text-sm ml-1 mt-4">Admin Zone</h3>
+          <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex items-center justify-between active:scale-95 transition-all shadow-lg"><div className="flex items-center gap-2">{deploying ? <Loader className="animate-spin" size={20} /> : <CloudUpload size={20} />}<span>Deploy System Content</span></div><Database size={20} className="opacity-50" /></button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- LESSON VIEW ---
+const LessonView = ({ lesson, onFinish }) => {
+  const [step, setStep] = useState(0); 
+  const [quizSelection, setQuizSelection] = useState(null);
+  if (!lesson) return null;
+
+  const renderContent = () => {
+    if (step === 0) return <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500"><div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 text-center"><div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm">🎓</div><h2 className="text-xl font-bold text-indigo-900 mb-2">{lesson.title}</h2><p className="text-indigo-700/80 text-sm">{lesson.description}</p></div><div className="space-y-3"><h3  e.preventDefault();
     if (!newClassName.trim()) return;
     // Generate a random join code
     const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
