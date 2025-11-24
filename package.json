@@ -2,6 +2,9 @@
   "name": "linguist-flow",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=14.0.0"
+  },
   "dependencies": {
     "firebase": "^10.8.0",
     "lucide-react": "^0.344.0",
@@ -11,9 +14,6 @@
     "web-vitals": "^2.1.4"
   },
   "devDependencies": {
-    "typescript": "4.9.5"
-  },
-  "overrides": {
     "typescript": "4.9.5"
   },
   "scripts": {
