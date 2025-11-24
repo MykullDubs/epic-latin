@@ -1,5 +1,5 @@
 {
   "framework": "create-react-app",
-  "installCommand": "npm install --no-package-lock --legacy-peer-deps",
+  "installCommand": "npm install --no-package-lock --legacy-peer-deps --force",
   "buildCommand": "CI=false npm run build"
 }
