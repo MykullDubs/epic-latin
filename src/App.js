@@ -411,6 +411,268 @@ const InstructorView = ({ user, allDecks, lessons, onSaveLesson, onSaveCard }) =
   );
 };
 
+// --- INSTRUCTOR DASHBOARD (TABLET/PC OPTIMIZED) ---
+const InstructorDashboard = ({ user, userData, allDecks, onSaveLesson, onSaveCard, onLogout }) => {
+  const [view, setView] = useState('dashboard'); // dashboard, classes, library, builder
+  const [classes, setClasses] = useState([]);
+  // Builder state lifted up for preview
+  const [builderData, setBuilderData] = useState({ title: '', subtitle: '', description: '', vocab: '', dialogue: [{ speaker: '', text: '', translation: '', side: 'left' }], quiz: { question: '', correctId: 'a', options: [{id:'a', text:''}, {id:'b', text:''}, {id:'c', text:''}] } });
+  const [builderMode, setBuilderMode] = useState('lesson'); // 'lesson' or 'deck'
+  
+  // Listen for classes
+  useEffect(() => {
+    const q = collection(db, 'artifacts', appId, 'users', user.uid, 'classes');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  const NavItem = ({ id, icon: Icon, label }) => (
+    <button 
+      onClick={() => setView(id)}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${view === id ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+    >
+      <Icon size={20} />
+      <span>{label}</span>
+    </button>
+  );
+
+  // Construct a preview lesson object compatible with LessonView
+  const previewLesson = {
+    ...builderData,
+    vocab: builderData.vocab ? builderData.vocab.split(',').map(s => s.trim()) : [],
+    xp: 100
+  };
+
+  return (
+    <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
+      {/* SIDEBAR */}
+      <div className="w-64 bg-white border-r border-slate-200 flex flex-col p-6 hidden md:flex">
+        <div className="flex items-center gap-3 mb-10 px-2">
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+            <GraduationCap size={24} />
+          </div>
+          <div>
+            <h1 className="font-bold text-lg leading-none">LinguistFlow</h1>
+            <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Magister Mode</span>
+          </div>
+        </div>
+
+        <div className="space-y-2 flex-1">
+          <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
+          <NavItem id="classes" icon={School} label="My Classes" />
+          <NavItem id="library" icon={Library} label="Content Library" />
+          <NavItem id="builder" icon={PlusCircle} label="Content Creator" />
+        </div>
+
+        <div className="pt-6 border-t border-slate-100">
+          <div className="flex items-center gap-3 px-2 mb-4">
+            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs">
+              {userData?.name?.charAt(0)}
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <p className="text-sm font-bold truncate">{userData?.name}</p>
+              <p className="text-xs text-slate-400 truncate">{user.email}</p>
+            </div>
+          </div>
+          <button onClick={onLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+            <LogOut size={16} /> Sign Out
+          </button>
+        </div>
+      </div>
+
+      {/* MAIN CONTENT AREA */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Top Bar (Mobile only) */}
+        <div className="md:hidden bg-white border-b border-slate-200 p-4 flex justify-between items-center sticky top-0 z-20">
+          <div className="font-bold text-indigo-700 flex items-center gap-2"><GraduationCap/> Magister</div>
+          <button onClick={onLogout}><LogOut size={20} className="text-slate-400"/></button>
+        </div>
+
+        <div className="p-6 max-w-6xl mx-auto">
+          
+          {/* DASHBOARD VIEW */}
+          {view === 'dashboard' && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <h2 className="text-2xl font-bold text-slate-800">Overview</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div><p className="text-slate-400 text-xs font-bold uppercase">Active Students</p><h3 className="text-3xl font-bold text-slate-900 mt-1">24</h3></div>
+                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Users size={24}/></div>
+                  </div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div><p className="text-slate-400 text-xs font-bold uppercase">Total Classes</p><h3 className="text-3xl font-bold text-slate-900 mt-1">{classes.length}</h3></div>
+                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><School size={24}/></div>
+                  </div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div><p className="text-slate-400 text-xs font-bold uppercase">Content Items</p><h3 className="text-3xl font-bold text-slate-900 mt-1">{Object.values(allDecks).reduce((acc, d) => acc + (d.cards?.length || 0), 0)}</h3></div>
+                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl"><Layers size={24}/></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <h3 className="font-bold text-slate-800 mb-4">Recent Activity</h3>
+                  <div className="space-y-4">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="flex items-center gap-3 pb-3 border-b border-slate-50 last:border-0">
+                        <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                        <p className="text-sm text-slate-600 flex-1">Marcus completed <b>Salutationes</b> quiz</p>
+                        <span className="text-xs text-slate-400">2m ago</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* CLASSES VIEW */}
+          {view === 'classes' && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-slate-800">My Classes</h2>
+                <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2"><Plus size={16}/> New Class</button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {classes.length === 0 && <div className="col-span-full p-12 text-center text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">No classes created yet.</div>}
+                {classes.map(cls => (
+                  <div key={cls.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow group relative">
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"><button className="text-slate-300 hover:text-indigo-600"><MoreVertical size={20}/></button></div>
+                    <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div>
+                    <h3 className="font-bold text-lg text-slate-900">{cls.name}</h3>
+                    <p className="text-sm text-slate-500 mb-4">{cls.students} Students Enrolled</p>
+                    <div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
+                      <span className="text-xs font-mono font-bold text-slate-600 tracking-wider">{cls.code}</span>
+                      <button className="text-indigo-600 text-xs font-bold flex items-center gap-1" onClick={() => navigator.clipboard.writeText(cls.code)}><Copy size={12}/> Copy Code</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* LIBRARY VIEW */}
+          {view === 'library' && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-slate-800">Content Library</h2>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                  <input placeholder="Search..." className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500" />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {Object.entries(allDecks).map(([key, deck]) => (
+                  <div key={key} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 transition-colors cursor-pointer">
+                    <div className="flex justify-between items-start mb-2">
+                      <Layers className="text-indigo-500" size={24} />
+                      <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-xs font-bold">{deck.cards?.length} Cards</span>
+                    </div>
+                    <h3 className="font-bold text-slate-900">{deck.title}</h3>
+                    <p className="text-xs text-slate-500 mt-1">System Deck</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* BUILDER VIEW WITH PREVIEW */}
+          {view === 'builder' && (
+            <div className="h-[calc(100vh-140px)] flex flex-col md:flex-row gap-6 animate-in fade-in duration-500">
+              {/* Editor Side */}
+              <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText size={18} /> Content Creator</h3>
+                    <div className="flex bg-slate-100 p-0.5 rounded-lg">
+                      <button onClick={() => setBuilderMode('lesson')} className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${builderMode === 'lesson' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Lesson</button>
+                      <button onClick={() => setBuilderMode('deck')} className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${builderMode === 'deck' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Deck</button>
+                    </div>
+                  </div>
+                  <button className="text-xs font-bold text-indigo-600 hover:underline" onClick={() => setBuilderData({ title: '', subtitle: '', description: '', vocab: '', dialogue: [{ speaker: '', text: '', translation: '', side: 'left' }], quiz: { question: '', correctId: 'a', options: [{id:'a', text:''}, {id:'b', text:''}, {id:'c', text:''}] } })}>Clear Form</button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-0">
+                  {builderMode === 'lesson' ? (
+                    <LessonBuilderView 
+                      data={builderData} 
+                      setData={setBuilderData} 
+                      onSave={(l) => { onSaveLesson(l); alert("Lesson Saved to Library"); }} 
+                    />
+                  ) : (
+                    <CardBuilderView 
+                      onSaveCard={onSaveCard}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Preview Side */}
+              {builderMode === 'lesson' && (
+                <div className="w-full md:w-[400px] bg-white rounded-[3rem] border-[8px] border-slate-900/10 shadow-xl overflow-hidden flex flex-col relative">
+                  {/* Simulated Notch */}
+                  <div className="absolute top-0 left-0 right-0 h-8 bg-white/0 z-50 pointer-events-none" />
+                  {/* Reusing LessonView for Live Preview */}
+                  <div className="flex-1 overflow-hidden bg-slate-50">
+                     <LessonView lesson={previewLesson} onFinish={() => alert("Preview Finished!")} />
+                  </div>
+                  <div className="bg-slate-100 p-2 text-center text-xs text-slate-400 font-bold uppercase tracking-wider border-t border-slate-200">
+                    Student Preview
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- CARD BUILDER VIEW (EXTRACTED) ---
+const CardBuilderView = ({ onSaveCard }) => {
+  const [formData, setFormData] = useState({ front: '', back: '', type: 'noun', sentence: '', translation: '' });
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleSubmit = (e) => { 
+    e.preventDefault(); 
+    if (!formData.front) return; 
+    onSaveCard({ 
+      front: formData.front, 
+      back: formData.back, 
+      type: formData.type, 
+      ipa: "/.../", 
+      mastery: 0, 
+      morphology: [{ part: formData.front, meaning: "Custom", type: "root" }], 
+      usage: { sentence: formData.sentence || "N/A", translation: formData.translation || "-" }, 
+      grammar_tags: ["Custom"] 
+    }); 
+    setFormData({ front: '', back: '', type: 'noun', sentence: '', translation: '' }); 
+    alert("Card Created!");
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="px-6 mt-4 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800">
+        <p className="font-bold flex items-center gap-2"><Layers size={16}/> Flashcard Deck Creator</p>
+        <p className="opacity-80 text-xs mt-1">Add cards one by one to build your custom deck.</p>
+      </div>
+      <div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Verbum (Latin)</label><input name="front" value={formData.front} onChange={handleChange} placeholder="e.g., Bellum" className="w-full p-4 rounded-xl border border-slate-200 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div>
+      <div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Translatio (English)</label><input name="back" value={formData.back} onChange={handleChange} placeholder="e.g., War" className="w-full p-4 rounded-xl border border-slate-200 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div>
+      <div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Genus (Type)</label><div className="grid grid-cols-2 gap-2">{['noun', 'verb', 'adverb', 'phrase'].map(type => (<button type="button" key={type} onClick={() => setFormData({ ...formData, type })} className={`p-3 rounded-lg text-sm font-bold capitalize transition-all border ${formData.type === type ? 'bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{type}</button>))}</div></div>
+      <button type="submit" className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Create Card</button>
+    </form>
+  );
+};
+
 // --- AUTH VIEW ---
 const AuthView = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -725,6 +987,41 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) 
   );
 };
 
+// --- CARD BUILDER VIEW (EXTRACTED) ---
+const CardBuilderView = ({ onSaveCard }) => {
+  const [formData, setFormData] = useState({ front: '', back: '', type: 'noun', sentence: '', translation: '' });
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleSubmit = (e) => { 
+    e.preventDefault(); 
+    if (!formData.front) return; 
+    onSaveCard({ 
+      front: formData.front, 
+      back: formData.back, 
+      type: formData.type, 
+      ipa: "/.../", 
+      mastery: 0, 
+      morphology: [{ part: formData.front, meaning: "Custom", type: "root" }], 
+      usage: { sentence: formData.sentence || "N/A", translation: formData.translation || "-" }, 
+      grammar_tags: ["Custom"] 
+    }); 
+    setFormData({ front: '', back: '', type: 'noun', sentence: '', translation: '' }); 
+    alert("Card Created!");
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="px-6 mt-4 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800">
+        <p className="font-bold flex items-center gap-2"><Layers size={16}/> Flashcard Deck Creator</p>
+        <p className="opacity-80 text-xs mt-1">Add cards one by one to build your custom deck.</p>
+      </div>
+      <div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Verbum (Latin)</label><input name="front" value={formData.front} onChange={handleChange} placeholder="e.g., Bellum" className="w-full p-4 rounded-xl border border-slate-200 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div>
+      <div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Translatio (English)</label><input name="back" value={formData.back} onChange={handleChange} placeholder="e.g., War" className="w-full p-4 rounded-xl border border-slate-200 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div>
+      <div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Genus (Type)</label><div className="grid grid-cols-2 gap-2">{['noun', 'verb', 'adverb', 'phrase'].map(type => (<button type="button" key={type} onClick={() => setFormData({ ...formData, type })} className={`p-3 rounded-lg text-sm font-bold capitalize transition-all border ${formData.type === type ? 'bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{type}</button>))}</div></div>
+      <button type="submit" className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Create Card</button>
+    </form>
+  );
+};
+
 // --- BUILDER HUB (GENERIC) ---
 const LessonBuilderView = ({ data, setData, onSave }) => { // Props updated to receive state
   const updateDialogue = (idx, field, val) => { 
@@ -753,16 +1050,8 @@ const BuilderHub = ({ onSaveCard, onSaveLesson }) => {
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', dialogue: [{ speaker: '', text: '', translation: '', side: 'left' }], quiz: { question: '', correctId: 'a', options: [{id:'a', text:''}, {id:'b', text:''}, {id:'c', text:''}] } });
   const [mode, setMode] = useState('card'); 
   
-  const CardForm = () => {
-    const [formData, setFormData] = useState({ front: '', back: '', type: 'noun', sentence: '', translation: '' });
-    const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-    const handleSubmit = (e) => { e.preventDefault(); if (!formData.front) return; onSaveCard({ front: formData.front, back: formData.back, type: formData.type, ipa: "/.../", mastery: 0, morphology: [{ part: formData.front, meaning: "Custom", type: "root" }], usage: { sentence: formData.sentence || "N/A", translation: formData.translation || "-" }, grammar_tags: ["Custom"] }); setFormData({ front: '', back: '', type: 'noun', sentence: '', translation: '' }); };
-    return (
-      <form onSubmit={handleSubmit} className="px-6 mt-4 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500"><div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Verbum (Latin)</label><input name="front" value={formData.front} onChange={handleChange} placeholder="e.g., Bellum" className="w-full p-4 rounded-xl border border-slate-200 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div><div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Translatio (English)</label><input name="back" value={formData.back} onChange={handleChange} placeholder="e.g., War" className="w-full p-4 rounded-xl border border-slate-200 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div><div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Genus (Type)</label><div className="grid grid-cols-2 gap-2">{['noun', 'verb', 'adverb', 'phrase'].map(type => (<button type="button" key={type} onClick={() => setFormData({ ...formData, type })} className={`p-3 rounded-lg text-sm font-bold capitalize transition-all border ${formData.type === type ? 'bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{type}</button>))}</div></div><button type="submit" className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Create Card</button></form>
-    );
-  };
   return (
-    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">{mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}{mode === 'card' && (<><div className="px-6 mt-2"><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button><button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button></div></div><CardForm /></>)}{mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} />}</div>
+    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">{mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}{mode === 'card' && (<><div className="px-6 mt-2"><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button><button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button></div></div><CardBuilderView onSaveCard={onSaveCard} /></>)}{mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} />}</div>
   );
 };
 
