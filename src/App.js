@@ -87,7 +87,7 @@ const DEFAULT_USER_DATA = {
   level: "Novice",
   streak: 1,
   xp: 0,
-  role: 'student' // 'student' or 'instructor'
+  // Role is now set dynamically during signup
 };
 
 // --- INITIAL SEED DATA ---
@@ -195,6 +195,103 @@ const Header = ({ title, subtitle, rightAction, onClickTitle }) => (
     {rightAction}
   </div>
 );
+
+// --- INSTRUCTOR (MAGISTER) VIEW ---
+const InstructorView = ({ user, allDecks, onSaveLesson, onSaveCard }) => {
+  const [subTab, setSubTab] = useState('classes');
+  const [classes, setClasses] = useState([]);
+  const [newClassName, setNewClassName] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    const q = collection(db, 'artifacts', appId, 'users', user.uid, 'classes');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleCreateClass = async (e) => {
+    e.preventDefault();
+    if (!newClassName.trim()) return;
+    const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), {
+      name: newClassName, code: joinCode, students: 0, created: Date.now()
+    });
+    setNewClassName('');
+  };
+
+  const handleDeleteClass = async (id) => {
+    if (window.confirm("Delete this class?")) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id));
+    }
+  };
+
+  const allCards = Object.values(allDecks).flatMap(deck => deck.cards || []);
+  const filteredCards = allCards.filter(c => 
+    c.front.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    c.back.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="h-full flex flex-col bg-slate-50">
+      <Header title="Magister" subtitle="Instructor Dashboard" />
+      <div className="px-6 mt-2">
+        <div className="flex bg-slate-200 p-1 rounded-xl">
+           <button onClick={() => setSubTab('classes')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'classes' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Classes</button>
+           <button onClick={() => setSubTab('library')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'library' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Library</button>
+           <button onClick={() => setSubTab('builder')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'builder' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Builder</button>
+        </div>
+      </div>
+      <div className="flex-1 px-6 mt-4 overflow-y-auto custom-scrollbar pb-24">
+        {subTab === 'classes' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <form onSubmit={handleCreateClass} className="flex gap-2">
+              <input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="flex-1 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500" />
+              <button type="submit" className="bg-indigo-600 text-white p-3 rounded-xl"><Plus /></button>
+            </form>
+            <div className="space-y-3">
+              {classes.map(cls => (
+                <div key={cls.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div>
+                        <h3 className="font-bold text-lg text-slate-900">{cls.name}</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-mono tracking-wider flex items-center gap-1">
+                                {cls.code} <Copy size={10} className="cursor-pointer" onClick={() => navigator.clipboard.writeText(cls.code)}/>
+                            </span>
+                            <span className="text-xs text-slate-400 flex items-center gap-1">
+                                <Users size={12} /> {cls.students} Students
+                            </span>
+                        </div>
+                    </div>
+                    <button onClick={() => handleDeleteClass(cls.id)} className="text-slate-300 hover:text-rose-500"><Trash2 size={18}/></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {subTab === 'library' && (
+          <div className="space-y-4 animate-in fade-in duration-300">
+            <div className="relative"><Search className="absolute left-3 top-3.5 text-slate-400" size={20} /><input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search cards..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              {filteredCards.slice(0, 10).map((card, idx) => (
+                <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm"><p className="font-bold text-slate-800">{card.front}</p><p className="text-xs text-slate-500">{card.back}</p></div>
+              ))}
+            </div>
+          </div>
+        )}
+        {subTab === 'builder' && (
+          <div className="animate-in fade-in duration-300">
+             <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800"><p className="font-bold flex items-center gap-2"><Brain size={16}/> Instructor Mode</p></div>
+             <LessonBuilderView onSave={(l) => { onSaveLesson(l); alert("Lesson Saved"); }} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // --- INSTRUCTOR DASHBOARD (TABLET/PC OPTIMIZED) ---
 const InstructorDashboard = ({ user, userData, allDecks, onSaveLesson, onSaveCard, onLogout }) => {
@@ -395,6 +492,7 @@ const AuthView = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [role, setRole] = useState('student'); // New state for role selection
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -409,7 +507,10 @@ const AuthView = () => {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
-          ...DEFAULT_USER_DATA, name: name || "Discipulus", email: user.email
+          ...DEFAULT_USER_DATA,
+          name: name || "Discipulus",
+          email: user.email,
+          role: role // Store the selected role permanently
         });
       }
     } catch (err) { setError(err.message.replace('Firebase: ', '')); } 
@@ -421,7 +522,24 @@ const AuthView = () => {
       <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
         <div className="text-center mb-8"><div className="w-20 h-20 bg-indigo-600 rounded-3xl mx-auto flex items-center justify-center text-white mb-4 shadow-xl shadow-indigo-200"><GraduationCap size={40} /></div><h1 className="text-3xl font-bold text-slate-900">LinguistFlow</h1><p className="text-slate-500 mt-2">Master Latin with depth & context.</p></div>
         <form onSubmit={handleAuth} className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {!isLogin && <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Name</label><div className="relative"><User className="absolute left-3 top-3.5 text-slate-400" size={20} /><input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Marcus Aurelius" required={!isLogin} /></div></div>}
+          {!isLogin && (
+            <>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Name</label><div className="relative"><User className="absolute left-3 top-3.5 text-slate-400" size={20} /><input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Marcus Aurelius" required={!isLogin} /></div></div>
+              
+              {/* Role Selection UI */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">I am a...</label>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setRole('student')} className={`flex-1 p-3 rounded-xl border font-bold text-sm transition-all flex items-center justify-center gap-2 ${role === 'student' ? 'bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
+                    <User size={16} /> Student
+                  </button>
+                  <button type="button" onClick={() => setRole('instructor')} className={`flex-1 p-3 rounded-xl border font-bold text-sm transition-all flex items-center justify-center gap-2 ${role === 'instructor' ? 'bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
+                    <School size={16} /> Instructor
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
           <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Email</label><div className="relative"><Mail className="absolute left-3 top-3.5 text-slate-400" size={20} /><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="marcus@rome.com" required /></div></div>
           <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Password</label><div className="relative"><Lock className="absolute left-3 top-3.5 text-slate-400" size={20} /><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="••••••••" required /></div></div>
           {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm rounded-lg border border-rose-100">{error}</div>}
@@ -447,26 +565,16 @@ const ProfileView = ({ user, userData }) => {
     setDeploying(false);
   };
 
-  const toggleRole = async () => {
-    const newRole = userData.role === 'instructor' ? 'student' : 'instructor';
-    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole });
-  };
-
   return (
     <div className="h-full flex flex-col bg-slate-50">
       <Header title="Ego" subtitle="Profile & Settings" />
       <div className="flex-1 px-6 mt-4 overflow-y-auto">
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center mb-6"><div className="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 mb-4 text-3xl font-bold">{userData?.name?.charAt(0) || "D"}</div><h2 className="text-2xl font-bold text-slate-900">{userData?.name}</h2><p className="text-slate-500 text-sm flex items-center gap-1 mt-1"><Mail size={14} /> {user.email}</p><div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase tracking-wider">{userData?.level || "Novice"}</div></div>
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center mb-6"><div className="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 mb-4 text-3xl font-bold">{userData?.name?.charAt(0) || "D"}</div><h2 className="text-2xl font-bold text-slate-900">{userData?.name}</h2><p className="text-slate-500 text-sm flex items-center gap-1 mt-1"><Mail size={14} /> {user.email}</p><div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase tracking-wider">{userData?.role || "Student"} • {userData?.level || "Novice"}</div></div>
         <div className="space-y-3">
-          <h3 className="font-bold text-slate-900 text-sm ml-1">Role Management</h3>
-          <button onClick={toggleRole} className="w-full bg-white p-4 rounded-xl border border-slate-200 text-slate-700 font-bold flex items-center justify-between active:bg-slate-50 transition-colors">
-            <div className="flex items-center gap-2"><School size={20} className="text-indigo-600"/> <span>Switch to {userData.role === 'instructor' ? 'Student' : 'Instructor'} View</span></div>
-            <ChevronRight size={16} className="text-slate-400"/>
-          </button>
-
-          <h3 className="font-bold text-slate-900 text-sm ml-1 mt-4">Account</h3>
+          <h3 className="font-bold text-slate-900 text-sm ml-1">Account</h3>
           <button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border border-slate-200 text-rose-600 font-bold flex items-center justify-between active:bg-rose-50 transition-colors"><span>Sign Out</span><LogOut size={20} /></button>
           
+          {/* Admin zone kept for deployment purposes, but role switching removed */}
           <h3 className="font-bold text-slate-900 text-sm ml-1 mt-4">Admin Zone</h3>
           <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex items-center justify-between active:scale-95 transition-all shadow-lg"><div className="flex items-center gap-2">{deploying ? <Loader className="animate-spin" size={20} /> : <UploadCloud size={20} />}<span>Deploy System Content</span></div><Database size={20} className="opacity-50" /></button>
         </div>
