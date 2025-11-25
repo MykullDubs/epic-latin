@@ -1,8 +1,5 @@
-const CACHE_NAME = 'linguist-flow-v2';
+const CACHE_NAME = 'linguist-flow-v3';
 
-// Only cache the absolute essentials for the shell to load.
-// We removed specific image references from here to prevent 
-// the SW from failing if an image is missing.
 const urlsToCache = [
   '/',
   '/index.html',
@@ -12,31 +9,30 @@ const urlsToCache = [
 
 // Install SW
 self.addEventListener('install', (event) => {
-  // Force this SW to become the active service worker immediately
-  self.skipWaiting();
+  self.skipWaiting(); // Activate immediately
 
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('Opened cache');
-        // We use 'addAll' cautiously. If one fails, we catch it so the SW still installs.
+        // We catch errors here so one missing file doesn't break the whole app
         return cache.addAll(urlsToCache).catch(err => {
-          console.warn('Failed to cache some assets, but proceeding:', err);
+          console.error('SW: Failed to cache some initial assets', err);
         });
       })
   );
 });
 
-// Activate the SW
+// Activate and Clean up old caches
 self.addEventListener('activate', (event) => {
-  // Take control of all pages immediately
-  event.waitUntil(clients.claim());
+  event.waitUntil(clients.claim()); // Take control immediately
 
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then((cacheNames) => Promise.all(
       cacheNames.map((cacheName) => {
         if (!cacheWhitelist.includes(cacheName)) {
+          console.log('SW: Deleting old cache', cacheName);
           return caches.delete(cacheName);
         }
       })
@@ -44,16 +40,22 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Listen for requests (Network First, Fallback to Cache)
+// Fetch Handler
 self.addEventListener('fetch', (event) => {
+  // 1. Ignore non-http requests (like chrome-extension://)
+  if (!event.request.url.startsWith('http')) return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // If network works, return response and update cache
-        if (!response || response.status !== 200 || response.type !== 'basic') {
+        // 2. Check if response is valid
+        if (!response || response.status !== 200) {
           return response;
         }
+
+        // 3. Clone response to save it to cache
         const responseToCache = response.clone();
+
         caches.open(CACHE_NAME)
           .then((cache) => {
             // Only cache GET requests
@@ -61,11 +63,18 @@ self.addEventListener('fetch', (event) => {
                cache.put(event.request, responseToCache);
             }
           });
+
         return response;
       })
       .catch(() => {
-        // If network fails, look in cache
-        return caches.match(event.request);
+        // 4. Network failed, fall back to cache
+        return caches.match(event.request)
+          .then((cachedResponse) => {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            // Optional: Return a custom offline page here if you have one
+          });
       })
   );
 });
