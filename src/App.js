@@ -427,12 +427,171 @@ const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData }) => (
   </div>
 );
 
+// --- LESSON VIEW ---
+const LessonView = ({ lesson, onFinish }) => {
+  const [step, setStep] = useState(0); 
+  const [quizSelection, setQuizSelection] = useState(null);
+  if (!lesson) return null;
+
+  const renderContent = () => {
+    if (step === 0) return <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500"><div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 text-center"><div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm">🎓</div><h2 className="text-xl font-bold text-indigo-900 mb-2">{lesson.title}</h2><p className="text-indigo-700/80 text-sm">{lesson.description}</p></div><div className="space-y-3"><h3 className="font-bold text-slate-400 text-xs uppercase tracking-wider">Key Vocabulary</h3>{lesson.vocab.map((phrase, i) => (<div key={i} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl shadow-sm"><Volume2 size={18} className="text-indigo-500" /><span className="font-medium text-slate-700">{phrase}</span></div>))}</div></div>;
+    if (step === 1) return <div className="space-y-4 animate-in fade-in duration-500">{lesson.dialogue.map((line, i) => (<div key={i} className={`flex ${line.side === 'right' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[80%] p-4 rounded-2xl text-sm shadow-sm ${line.side === 'right' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'}`}><p className="font-bold text-xs opacity-70 mb-1">{line.speaker}</p><p className="text-base font-medium mb-1">{line.text}</p><p className={`text-xs italic ${line.side === 'right' ? 'text-indigo-200' : 'text-slate-400'}`}>{line.translation}</p></div></div>))}</div>;
+    if (step === 2) return <div className="animate-in fade-in duration-500"><div className="bg-white p-6 rounded-3xl shadow-lg border border-slate-100 text-center mb-6"><Brain size={40} className="mx-auto text-indigo-500 mb-4" /><h3 className="text-lg font-bold text-slate-800 mb-2">Pop Quiz!</h3><p className="text-slate-600">{lesson.quiz.question}</p></div><div className="space-y-3">{lesson.quiz.options.map((opt) => (<button key={opt.id} onClick={() => setQuizSelection(opt.id)} className={`w-full p-4 rounded-xl border-2 font-bold text-left transition-all ${quizSelection === opt.id ? opt.id === lesson.quiz.correctId ? 'border-green-500 bg-green-50 text-green-700' : 'border-red-500 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-slate-600'}`}>{opt.text}</button>))}</div></div>;
+    if (step === 3) return <div className="text-center py-10 animate-in zoom-in duration-500"><div className="w-24 h-24 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6"><Award size={48} className="text-yellow-600" /></div><h2 className="text-3xl font-bold text-slate-900 mb-2">Optime!</h2><p className="text-slate-500 mb-8">Lesson Complete. +{lesson.xp} XP</p><button onClick={() => onFinish(lesson.xp)} className="bg-indigo-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:scale-105 transition-transform">Return Home</button></div>;
+  };
+  return (
+    <div className="pb-24 min-h-full flex flex-col bg-slate-50">
+      <Header title="Lectio" subtitle={lesson.title} rightAction={<button onClick={() => onFinish(0)}><X size={24} className="text-slate-400" /></button>} />
+      <div className="flex-1 px-6 mt-2 overflow-y-auto custom-scrollbar"><div className="flex gap-2 mb-8">{[0, 1, 2, 3].map(s => (<div key={s} className={`h-1.5 flex-1 rounded-full transition-colors duration-500 ${s <= step ? 'bg-indigo-600' : 'bg-slate-200'}`} />))}</div>{renderContent()}</div>
+      {step < 3 && <div className="p-6 bg-white border-t border-slate-100 sticky bottom-0 z-30 pb-safe"><button disabled={step === 2 && quizSelection !== lesson.quiz.correctId} onClick={() => setStep(step + 1)} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2">{step === 2 ? 'Finish Lesson' : 'Continue'} <ChevronRight size={20} /></button></div>}
+    </div>
+  );
+};
+
+// --- FLASHCARD VIEW (RESTORED) ---
+const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) => {
+  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [manageMode, setManageMode] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [xrayMode, setXrayMode] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [quickAddData, setQuickAddData] = useState({ front: '', back: '', type: 'noun' });
+  
+  const currentDeck = allDecks[selectedDeckKey];
+  const cards = currentDeck?.cards || [];
+  const card = cards[currentIndex];
+  const theme = card ? (TYPE_COLORS[card.type] || TYPE_COLORS.noun) : TYPE_COLORS.noun;
+
+  const handleDeckChange = (key) => {
+    onSelectDeck(key);
+    setIsSelectorOpen(false);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setXrayMode(false);
+    setManageMode(false);
+  };
+
+  const filteredCards = cards.filter(c => 
+    c.front.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    c.back.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleQuickAdd = (e) => {
+    e.preventDefault();
+    if(!quickAddData.front || !quickAddData.back) return;
+    onSaveCard({
+        ...quickAddData,
+        ipa: "/.../",
+        mastery: 0,
+        morphology: [{ part: quickAddData.front, meaning: "Custom", type: "root" }],
+        usage: { sentence: "-", translation: "-" },
+        grammar_tags: ["Quick Add"]
+    });
+    setQuickAddData({ front: '', back: '', type: 'noun' });
+    setSearchTerm(''); 
+    alert("Card Added!");
+  };
+
+  if (!card && !manageMode) return <div className="h-full flex flex-col bg-slate-50"><Header title={currentDeck?.title || "Empty Deck"} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<button onClick={() => setManageMode(true)} className="p-2 bg-slate-100 rounded-full"><List size={20} className="text-slate-600" /></button>} /><div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400"><Layers size={48} className="mb-4 opacity-20" /><p>This deck is empty.</p><button onClick={() => setManageMode(true)} className="mt-4 text-indigo-600 font-bold text-sm">Add Cards</button></div></div>;
+
+  return (
+    <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden">
+      <Header 
+        title={currentDeck?.title.split(' ')[1] || "Deck"} 
+        subtitle={`${currentIndex + 1} / ${cards.length}`} 
+        onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} 
+        rightAction={
+          <div className="flex items-center gap-2">
+             <button onClick={() => setManageMode(!manageMode)} className={`p-2 rounded-full transition-colors ${manageMode ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+               {manageMode ? <X size={20} /> : <List size={20} />}
+             </button>
+          </div>
+        }
+      />
+      
+      {/* DECK SELECTOR */}
+      {isSelectorOpen && <div className="absolute top-24 left-6 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 animate-in fade-in slide-in-from-top-4">{Object.entries(allDecks).map(([key, deck]) => (<button key={key} onClick={() => handleDeckChange(key)} className={`w-full text-left p-3 rounded-xl font-bold text-sm mb-1 ${selectedDeckKey === key ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}>{deck.title} <span className="float-right opacity-50">{deck.cards.length}</span></button>))}</div>}
+      {isSelectorOpen && <div className="absolute inset-0 z-40 bg-black/5 backdrop-blur-[1px]" onClick={() => setIsSelectorOpen(false)} />}
+
+      {/* MANAGE MODE OVERLAY */}
+      {manageMode && (
+        <div className="absolute inset-0 top-[80px] bg-slate-50 z-30 flex flex-col animate-in slide-in-from-bottom-10 duration-300 p-6 overflow-y-auto pb-24">
+           <h3 className="font-bold text-slate-900 mb-4">Deck Manager</h3>
+           <div className="relative mb-6">
+             <Search className="absolute left-3 top-3.5 text-slate-400" size={18} />
+             <input 
+               value={searchTerm}
+               onChange={(e) => setSearchTerm(e.target.value)}
+               placeholder={`Search ${cards.length} cards...`}
+               className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm"
+             />
+           </div>
+           {selectedDeckKey === 'custom' && (
+             <div className="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm mb-6">
+               <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-3 flex items-center gap-2"><PlusCircle size={14}/> Quick Add</h4>
+               <div className="flex gap-2 mb-2">
+                 <input placeholder="Latin Word" value={quickAddData.front} onChange={(e) => setQuickAddData({...quickAddData, front: e.target.value})} className="flex-1 p-2 bg-slate-50 rounded border border-slate-200 text-sm font-bold" />
+                 <select value={quickAddData.type} onChange={(e) => setQuickAddData({...quickAddData, type: e.target.value})} className="p-2 bg-slate-50 rounded border border-slate-200 text-xs">
+                   <option value="noun">Noun</option><option value="verb">Verb</option><option value="phrase">Phrase</option>
+                 </select>
+               </div>
+               <div className="flex gap-2">
+                 <input placeholder="English Meaning" value={quickAddData.back} onChange={(e) => setQuickAddData({...quickAddData, back: e.target.value})} className="flex-1 p-2 bg-slate-50 rounded border border-slate-200 text-sm" />
+                 <button onClick={handleQuickAdd} className="bg-indigo-600 text-white p-2 rounded-lg"><Plus size={18}/></button>
+               </div>
+             </div>
+           )}
+           <div className="space-y-2">
+             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cards in Deck</p>
+             {filteredCards.map((c, idx) => (
+               <button key={idx} onClick={() => { setCurrentIndex(cards.indexOf(c)); setManageMode(false); }} className="w-full bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center hover:border-indigo-300 transition-colors text-left">
+                 <div><span className="font-bold text-slate-800">{c.front}</span><span className="text-slate-400 mx-2">•</span><span className="text-sm text-slate-500">{c.back}</span></div>
+                 <ArrowRight size={16} className="text-slate-300" />
+               </button>
+             ))}
+             {filteredCards.length === 0 && <p className="text-slate-400 text-sm italic">No cards found.</p>}
+           </div>
+        </div>
+      )}
+
+      {/* MAIN CARD AREA */}
+      {!manageMode && card && (
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0">
+        <div className={`relative w-full h-full max-h-[520px] transition-all duration-500 transform preserve-3d cursor-pointer shadow-2xl rounded-3xl ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => !xrayMode && setIsFlipped(!isFlipped)}>
+          <div className="absolute inset-0 backface-hidden bg-white rounded-3xl border border-slate-100 overflow-hidden flex flex-col">
+            <div className={`h-2 w-full ${xrayMode ? theme.bg.replace('50', '500') : 'bg-slate-100'} transition-colors duration-500`} />
+            <div className="flex-1 flex flex-col p-6 relative">
+              <div className="flex justify-between items-start mb-8"><span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${theme.bg} ${theme.text} border ${theme.border}`}>{card.type}</span></div>
+              <div className="flex-1 flex flex-col items-center justify-center mt-[-40px]"><h2 className="text-4xl sm:text-5xl font-serif font-bold text-slate-900 text-center mb-4 leading-tight">{card.front}</h2><div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-full border border-slate-100"><button onClick={(e) => { e.stopPropagation(); }} className="p-2 bg-white rounded-full shadow-sm text-indigo-600 hover:scale-110 transition-transform active:scale-90"><Volume2 size={18} /></button><span className="font-mono text-slate-500 text-sm tracking-wide">{card.ipa}</span></div></div>
+              <div className={`absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur-xl border-t border-slate-100 transition-all duration-500 ease-in-out flex flex-col overflow-hidden z-20 ${xrayMode ? 'h-[75%] opacity-100 rounded-t-3xl shadow-[-10px_-10px_30px_rgba(0,0,0,0.05)]' : 'h-0 opacity-0'}`}><div className="p-6 overflow-y-auto custom-scrollbar space-y-6"><div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Puzzle size={14} /> Morphologia</h4><div className="flex flex-wrap gap-2">{card.morphology && card.morphology.map((m, i) => (<div key={i} className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-lg p-2 min-w-[60px]"><span className={`font-bold text-lg ${m.type === 'root' ? 'text-indigo-600' : 'text-slate-700'}`}>{m.part}</span><span className="text-[9px] text-slate-400 font-medium uppercase mt-1 text-center max-w-[80px] leading-tight">{m.meaning}</span></div>))}</div></div><div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><MessageSquare size={14} /> Exemplum</h4><div className={`p-4 rounded-xl border ${theme.border} ${theme.bg}`}><p className="text-slate-800 font-serif font-medium text-lg mb-1">"{card.usage.sentence}"</p><p className={`text-sm ${theme.text} opacity-80 italic`}>{card.usage.translation}</p></div></div></div></div>
+              {!xrayMode && (<div className="mt-auto text-center"><p className="text-xs text-slate-400 font-medium animate-pulse">Tap to flip</p></div>)}
+            </div>
+          </div>
+          <div className="absolute inset-0 backface-hidden rotate-y-180 bg-slate-900 rounded-3xl shadow-xl flex flex-col items-center justify-center p-8 text-white relative overflow-hidden"><div className="relative z-10 flex flex-col items-center"><span className="text-indigo-300 text-xs font-bold uppercase tracking-widest mb-6 border-b border-indigo-500/30 pb-2">Translatio</span><h2 className="text-4xl font-bold text-center mb-8 leading-tight">{card.back}</h2></div></div>
+        </div>
+      </div>
+      )}
+
+      <div className="px-6 pb-4">
+        <div className="flex items-center justify-between max-w-sm mx-auto">
+          <button onClick={() => { setXrayMode(false); setIsFlipped(false); setTimeout(() => setCurrentIndex((prev) => (prev - 1 + cards.length) % cards.length), 200); }} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-rose-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all"><X size={28} strokeWidth={2.5} /></button>
+          <button onClick={(e) => { e.stopPropagation(); if(isFlipped) setIsFlipped(false); setXrayMode(!xrayMode); }} className={`h-20 w-20 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all duration-300 border-2 ${xrayMode ? 'bg-indigo-600 border-indigo-600 text-white translate-y-[-8px] shadow-indigo-200' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}><Search size={28} strokeWidth={xrayMode ? 3 : 2} className={xrayMode ? 'animate-pulse' : ''} /><span className="text-[10px] font-black tracking-wider mt-1">X-RAY</span></button>
+          <button onClick={() => { setXrayMode(false); setIsFlipped(false); setTimeout(() => setCurrentIndex((prev) => (prev + 1) % cards.length), 200); }} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-emerald-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all"><Check size={28} strokeWidth={2.5} /></button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- MAIN APP ---
 const App = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  
+  // Data State
   const [systemDecks, setSystemDecks] = useState({});
   const [systemLessons, setSystemLessons] = useState([]);
   const [customCards, setCustomCards] = useState([]);
@@ -475,8 +634,8 @@ const App = () => {
 
   return (
     <div className="bg-slate-100 min-h-screen font-sans text-slate-900 flex justify-center items-center p-0 sm:p-4">
-      <div className="bg-slate-50 w-full max-w-[400px] h-[100dvh] sm:h-[800px] sm:rounded-[3rem] shadow-2xl relative overflow-hidden border-[8px] border-slate-900/5 sm:border-slate-900/10">
-        <div className="absolute top-0 left-0 right-0 h-8 bg-white/0 z-50 pointer-events-none" />
+      <div className={`bg-slate-50 w-full h-[100dvh] shadow-2xl relative overflow-hidden border-[8px] border-slate-900/5 sm:border-slate-900/10 ${userData?.role === 'instructor' ? 'max-w-full sm:rounded-none border-0' : 'max-w-[400px] sm:rounded-[3rem] sm:h-[800px]'}`}>
+        {userData?.role !== 'instructor' && <div className="absolute top-0 left-0 right-0 h-8 bg-white/0 z-50 pointer-events-none" />}
         {renderStudentView()}
         <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
       </div>
