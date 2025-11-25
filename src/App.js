@@ -362,6 +362,51 @@ const ProfileView = ({ user, userData }) => {
   );
 };
 
+// --- HOME VIEW (RESTORED) ---
+const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData }) => (
+  <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full">
+    <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." />
+    
+    <div className="px-6 space-y-6 mt-4">
+      <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl shadow-rose-200 relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition-transform duration-700" />
+        <div className="flex justify-between items-start relative z-10">
+          <div><p className="text-rose-100 font-medium mb-1 text-sm uppercase tracking-wider">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp || 0} <span className="text-lg font-sans font-normal text-rose-200">XP</span></h3></div>
+          <div className="bg-white/10 p-2.5 rounded-xl backdrop-blur-md border border-white/20"><Zap size={28} className="text-yellow-400" fill="currentColor" /></div>
+        </div>
+        <div className="mt-6 bg-black/20 rounded-full h-3 w-full overflow-hidden"><div className="bg-gradient-to-r from-yellow-300 to-amber-500 h-full w-[75%] rounded-full" /></div>
+        <div className="flex justify-between mt-3 text-xs font-medium text-rose-100"><span>Rank: Centurion</span><span>{userData?.streak || 1} Dies Igne 🔥</span></div>
+      </div>
+
+      <div>
+        <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600" /> Available Lessons</h3>
+        <div className="space-y-3">
+          {lessons.map(lesson => (
+            <button key={lesson.id} onClick={() => onSelectLesson(lesson)} className="w-full bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:shadow-md group">
+              <div className="flex items-center space-x-4">
+                <div className="h-14 w-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700 group-hover:bg-amber-200 transition-colors"><PlayCircle size={28} /></div>
+                <div className="text-left"><h4 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{lesson.title}</h4><p className="text-xs text-slate-500">{lesson.subtitle || 'Custom Lesson'}</p></div>
+              </div>
+              <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-600 transition-colors" />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <button onClick={() => setActiveTab('flashcards')} className="p-5 bg-orange-50 rounded-2xl border border-orange-100 flex flex-col items-center justify-center text-center space-y-3 hover:bg-orange-100 active:scale-95 transition-all">
+          <div className="bg-white p-3 rounded-full shadow-sm"><Layers className="text-orange-500" size={24} /></div>
+          <div><span className="block font-bold text-slate-800">Repetitio</span><span className="text-xs text-slate-500">Smart Deck</span></div>
+        </button>
+        <button onClick={() => setActiveTab('create')} className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 flex flex-col items-center justify-center text-center space-y-3 hover:bg-emerald-100 active:scale-95 transition-all">
+          <div className="bg-white p-3 rounded-full shadow-sm"><Feather className="text-emerald-500" size={24} /></div>
+          <div><span className="block font-bold text-slate-800">Scriptorium</span><span className="text-xs text-slate-500">Build Content</span></div>
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 // --- LESSON VIEW ---
 const LessonView = ({ lesson, onFinish }) => {
   const [step, setStep] = useState(0); 
@@ -424,43 +469,9 @@ const LessonBuilderView = ({ onSave }) => {
 
   return (
     <div className="px-6 mt-4 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-        <h3 className="font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> Basics</h3>
-        <input className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm font-bold" placeholder="Lesson Title" value={data.title} onChange={e => setData({...data, title: e.target.value})} />
-        <input className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm" placeholder="Subtitle" value={data.subtitle} onChange={e => setData({...data, subtitle: e.target.value})} />
-        <textarea className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm" rows={2} placeholder="Description" value={data.description} onChange={e => setData({...data, description: e.target.value})} />
-        <input className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm" placeholder="Vocab list (comma separated)" value={data.vocab} onChange={e => setData({...data, vocab: e.target.value})} />
-      </section>
-      <section className="space-y-4">
-        <h3 className="font-bold text-slate-800 flex items-center gap-2 px-1"><MessageSquare size={18} className="text-indigo-600"/> Dialogue</h3>
-        {data.dialogue.map((line, i) => (
-          <div key={i} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative group">
-            <button onClick={() => removeLine(i)} className="absolute top-2 right-2 text-slate-300 hover:text-red-500"><Trash2 size={16} /></button>
-            <div className="flex gap-2 mb-2">
-              <input className="flex-1 p-2 bg-slate-50 rounded border border-slate-100 text-xs font-bold" placeholder="Speaker" value={line.speaker} onChange={e => updateDialogue(i, 'speaker', e.target.value)} />
-              <select className="p-2 bg-slate-50 rounded border border-slate-100 text-xs" value={line.side} onChange={e => updateDialogue(i, 'side', e.target.value)}>
-                <option value="left">Left (You)</option>
-                <option value="right">Right (Other)</option>
-              </select>
-            </div>
-            <input className="w-full mb-2 p-2 bg-slate-50 rounded border border-slate-100 text-sm" placeholder="Latin text" value={line.text} onChange={e => updateDialogue(i, 'text', e.target.value)} />
-            <input className="w-full p-2 bg-slate-50 rounded border border-slate-100 text-xs italic text-slate-500" placeholder="English translation" value={line.translation} onChange={e => updateDialogue(i, 'translation', e.target.value)} />
-          </div>
-        ))}
-        <button onClick={addLine} className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold flex items-center justify-center gap-2 hover:bg-slate-50 hover:border-indigo-200 hover:text-indigo-500 transition-all"><Plus size={18} /> Add Line</button>
-      </section>
-      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-        <h3 className="font-bold text-slate-800 flex items-center gap-2"><Brain size={18} className="text-indigo-600"/> Quiz</h3>
-        <input className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm font-bold" placeholder="Question text" value={data.quiz.question} onChange={e => setData({...data, quiz: {...data.quiz, question: e.target.value}})} />
-        <div className="space-y-2">
-          {data.quiz.options.map((opt, i) => (
-            <div key={opt.id} className="flex gap-2 items-center">
-              <input type="radio" name="correct" checked={data.quiz.correctId === opt.id} onChange={() => setData({...data, quiz: {...data.quiz, correctId: opt.id}})} />
-              <input className="flex-1 p-2 bg-slate-50 rounded border border-slate-100 text-sm" placeholder={`Option ${opt.id.toUpperCase()}`} value={opt.text} onChange={e => updateOption(i, e.target.value)} />
-            </div>
-          ))}
-        </div>
-      </section>
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm"><h3 className="font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> Basics</h3><input className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm font-bold" placeholder="Lesson Title" value={data.title} onChange={e => setData({...data, title: e.target.value})} /><input className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm" placeholder="Subtitle" value={data.subtitle} onChange={e => setData({...data, subtitle: e.target.value})} /><textarea className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm" rows={2} placeholder="Description" value={data.description} onChange={e => setData({...data, description: e.target.value})} /><input className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm" placeholder="Vocab list (comma separated)" value={data.vocab} onChange={e => setData({...data, vocab: e.target.value})} /></section>
+      <section className="space-y-4"><h3 className="font-bold text-slate-800 flex items-center gap-2 px-1"><MessageSquare size={18} className="text-indigo-600"/> Dialogue</h3>{data.dialogue.map((line, i) => (<div key={i} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative group"><button onClick={() => removeLine(i)} className="absolute top-2 right-2 text-slate-300 hover:text-red-500"><Trash2 size={16} /></button><div className="flex gap-2 mb-2"><input className="flex-1 p-2 bg-slate-50 rounded border border-slate-100 text-xs font-bold" placeholder="Speaker" value={line.speaker} onChange={e => updateDialogue(i, 'speaker', e.target.value)} /><select className="p-2 bg-slate-50 rounded border border-slate-100 text-xs" value={line.side} onChange={e => updateDialogue(i, 'side', e.target.value)}><option value="left">Left (You)</option><option value="right">Right (Other)</option></select></div><input className="w-full mb-2 p-2 bg-slate-50 rounded border border-slate-100 text-sm" placeholder="Latin text" value={line.text} onChange={e => updateDialogue(i, 'text', e.target.value)} /><input className="w-full p-2 bg-slate-50 rounded border border-slate-100 text-xs italic text-slate-500" placeholder="English translation" value={line.translation} onChange={e => updateDialogue(i, 'translation', e.target.value)} /></div>))}<button onClick={addLine} className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold flex items-center justify-center gap-2 hover:bg-slate-50 hover:border-indigo-200 hover:text-indigo-500 transition-all"><Plus size={18} /> Add Line</button></section>
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm"><h3 className="font-bold text-slate-800 flex items-center gap-2"><Brain size={18} className="text-indigo-600"/> Quiz</h3><input className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm font-bold" placeholder="Question text" value={data.quiz.question} onChange={e => setData({...data, quiz: {...data.quiz, question: e.target.value}})} /><div className="space-y-2">{data.quiz.options.map((opt, i) => (<div key={opt.id} className="flex gap-2 items-center"><input type="radio" name="correct" checked={data.quiz.correctId === opt.id} onChange={() => setData({...data, quiz: {...data.quiz, correctId: opt.id}})} /><input className="flex-1 p-2 bg-slate-50 rounded border border-slate-100 text-sm" placeholder={`Option ${opt.id.toUpperCase()}`} value={opt.text} onChange={e => updateOption(i, e.target.value)} /></div>))}</div></section>
       <button onClick={handleSave} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Save Lesson</button>
     </div>
   );
@@ -474,30 +485,11 @@ const BuilderHub = ({ onSaveCard, onSaveLesson }) => {
     const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
     const handleSubmit = (e) => { e.preventDefault(); if (!formData.front) return; onSaveCard({ front: formData.front, back: formData.back, type: formData.type, ipa: "/.../", mastery: 0, morphology: [{ part: formData.front, meaning: "Custom", type: "root" }], usage: { sentence: formData.sentence || "N/A", translation: formData.translation || "-" }, grammar_tags: ["Custom"] }); setFormData({ front: '', back: '', type: 'noun', sentence: '', translation: '' }); };
     return (
-      <form onSubmit={handleSubmit} className="px-6 mt-4 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Verbum (Latin)</label><input name="front" value={formData.front} onChange={handleChange} placeholder="e.g., Bellum" className="w-full p-4 rounded-xl border border-slate-200 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div>
-        <div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Translatio (English)</label><input name="back" value={formData.back} onChange={handleChange} placeholder="e.g., War" className="w-full p-4 rounded-xl border border-slate-200 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div>
-        <div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Genus (Type)</label><div className="grid grid-cols-2 gap-2">{['noun', 'verb', 'adverb', 'phrase'].map(type => (<button type="button" key={type} onClick={() => setFormData({ ...formData, type })} className={`p-3 rounded-lg text-sm font-bold capitalize transition-all border ${formData.type === type ? 'bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{type}</button>))}</div></div>
-        <button type="submit" className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Create Card</button>
-      </form>
+      <form onSubmit={handleSubmit} className="px-6 mt-4 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500"><div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Verbum (Latin)</label><input name="front" value={formData.front} onChange={handleChange} placeholder="e.g., Bellum" className="w-full p-4 rounded-xl border border-slate-200 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div><div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Translatio (English)</label><input name="back" value={formData.back} onChange={handleChange} placeholder="e.g., War" className="w-full p-4 rounded-xl border border-slate-200 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div><div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Genus (Type)</label><div className="grid grid-cols-2 gap-2">{['noun', 'verb', 'adverb', 'phrase'].map(type => (<button type="button" key={type} onClick={() => setFormData({ ...formData, type })} className={`p-3 rounded-lg text-sm font-bold capitalize transition-all border ${formData.type === type ? 'bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{type}</button>))}</div></div><button type="submit" className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Create Card</button></form>
     );
   };
   return (
-    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">
-      {mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}
-      {mode === 'card' && (
-        <>
-          <div className="px-6 mt-2">
-            <div className="flex bg-slate-200 p-1 rounded-xl">
-               <button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button>
-               <button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button>
-            </div>
-          </div>
-          <CardForm />
-        </>
-      )}
-      {mode === 'lesson' && <LessonBuilderView onSave={onSaveLesson} />}
-    </div>
+    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">{mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}{mode === 'card' && (<><div className="px-6 mt-2"><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button><button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button></div></div><CardForm /></>)}{mode === 'lesson' && <LessonBuilderView onSave={onSaveLesson} />}</div>
   );
 };
 
