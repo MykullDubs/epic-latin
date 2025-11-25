@@ -57,7 +57,8 @@ import {
   List,
   ArrowRight,
   LayoutDashboard,
-  ArrowLeft
+  ArrowLeft,
+  Library
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
