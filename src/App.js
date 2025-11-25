@@ -88,19 +88,45 @@ const DEFAULT_USER_DATA = {
   role: 'student'
 };
 
-// --- SEED DATA ---
+// --- ROBUST SEED DATA (The "Beefy" Content) ---
 const INITIAL_SYSTEM_DECKS = {
   salutationes: {
     title: "👋 Salutationes",
     cards: [
       { id: 's1', front: "Salve", back: "Hello (Singular)", ipa: "/ˈsal.weː/", type: "phrase", mastery: 4, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-e", meaning: "Imp. Sing.", type: "suffix" }], usage: { sentence: "Salve, Marce!", translation: "Hello, Marcus!" }, grammar_tags: ["Imperative", "Greeting"] },
-      { id: 's2', front: "Salvete", back: "Hello (Plural)", ipa: "/salˈweː.te/", type: "phrase", mastery: 3, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-ete", meaning: "Imp. Pl.", type: "suffix" }], usage: { sentence: "Salvete, discipuli!", translation: "Hello, students!" }, grammar_tags: ["Imperative", "Greeting"] }
+      { id: 's2', front: "Salvete", back: "Hello (Plural)", ipa: "/salˈweː.te/", type: "phrase", mastery: 3, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-ete", meaning: "Imp. Pl.", type: "suffix" }], usage: { sentence: "Salvete, discipuli!", translation: "Hello, students!" }, grammar_tags: ["Imperative", "Greeting"] },
+      { id: 's3', front: "Vale", back: "Goodbye", ipa: "/ˈwa.leː/", type: "phrase", mastery: 3, morphology: [{ part: "Val-", meaning: "Be strong", type: "root" }, { part: "-e", meaning: "Imp.", type: "suffix" }], usage: { sentence: "Vale, amice.", translation: "Goodbye, friend." }, grammar_tags: ["Valediction"] },
+      { id: 's4', front: "Quid agis?", back: "How are you?", ipa: "/kʷid ˈa.ɡis/", type: "phrase", mastery: 2, morphology: [{ part: "Quid", meaning: "What", type: "pronoun" }, { part: "Agis", meaning: "You do", type: "verb" }], usage: { sentence: "Quid agis hodie?", translation: "How are you today?" }, grammar_tags: ["Interrogative", "Idiom"] }
     ]
   },
   medicina: {
     title: "⚕️ Medicina",
     cards: [
-      { id: 'm1', front: "Vulnus", back: "Wound", ipa: "/ˈwul.nus/", type: "noun", mastery: 1, morphology: [{ part: "Vuln-", meaning: "Wound", type: "root" }, { part: "-us", meaning: "Nom.", type: "suffix" }], usage: { sentence: "Vulnus grave est.", translation: "The wound is serious." }, grammar_tags: ["3rd Declension"] }
+      { id: 'm1', front: "Vulnus", back: "Wound", ipa: "/ˈwul.nus/", type: "noun", mastery: 1, morphology: [{ part: "Vuln-", meaning: "Wound", type: "root" }, { part: "-us", meaning: "Nom.", type: "suffix" }], usage: { sentence: "Vulnus grave est.", translation: "The wound is serious." }, grammar_tags: ["3rd Declension"] },
+      { id: 'm2', front: "Curare", back: "To cure", ipa: "/kuˈraː.re/", type: "verb", mastery: 2, morphology: [{ part: "Cur-", meaning: "Care", type: "root" }, { part: "-are", meaning: "Inf.", type: "suffix" }], usage: { sentence: "Medicus curat.", translation: "The doctor cures." }, grammar_tags: ["1st Conjugation"] },
+      { id: 'm3', front: "Aeger", back: "Sick", ipa: "/ˈae̯.ɡer/", type: "adjective", mastery: 3, morphology: [{ part: "Aegr-", meaning: "Sick", type: "root" }], usage: { sentence: "Puer aeger est.", translation: "The boy is sick." }, grammar_tags: ["Adjective"] }
+    ]
+  },
+  bellum: {
+    title: "⚔️ Bellum",
+    cards: [
+      { id: 'b1', front: "Bellum", back: "War", ipa: "/ˈbel.lum/", type: "noun", mastery: 4, morphology: [{ part: "Bell-", meaning: "War", type: "root" }, { part: "-um", meaning: "Neut.", type: "suffix" }], usage: { sentence: "Para bellum.", translation: "Prepare for war." }, grammar_tags: ["2nd Declension"] },
+      { id: 'b2', front: "Gladius", back: "Sword", ipa: "/ˈɡla.di.us/", type: "noun", mastery: 2, morphology: [{ part: "Gladi-", meaning: "Sword", type: "root" }, { part: "-us", meaning: "Masc.", type: "suffix" }], usage: { sentence: "Gladius ferreus.", translation: "Iron sword." }, grammar_tags: ["2nd Declension"] },
+      { id: 'b3', front: "Vincere", back: "To conquer", ipa: "/ˈwin.ke.re/", type: "verb", mastery: 3, morphology: [{ part: "Vinc-", meaning: "Conquer", type: "root" }, { part: "-ere", meaning: "Inf.", type: "suffix" }], usage: { sentence: "Veni, vidi, vici.", translation: "I came, I saw, I conquered." }, grammar_tags: ["3rd Conjugation"] }
+    ]
+  },
+  mare: {
+    title: "🌊 Mare",
+    cards: [
+      { id: 'sea1', front: "Navis", back: "Ship", ipa: "/ˈnaː.wis/", type: "noun", mastery: 2, morphology: [{ part: "Nav-", meaning: "Ship", type: "root" }, { part: "-is", meaning: "Fem.", type: "suffix" }], usage: { sentence: "Navis navigat.", translation: "The ship sails." }, grammar_tags: ["3rd Declension"] },
+      { id: 'sea2', front: "Nauta", back: "Sailor", ipa: "/ˈnau̯.ta/", type: "noun", mastery: 3, morphology: [{ part: "Naut-", meaning: "Sailor", type: "root" }, { part: "-a", meaning: "Masc.", type: "suffix" }], usage: { sentence: "Nauta stellas spectat.", translation: "The sailor watches the stars." }, grammar_tags: ["1st Declension"] }
+    ]
+  },
+  iter: {
+    title: "🗺️ Iter",
+    cards: [
+      { id: 'i1', front: "Iter", back: "Journey", ipa: "/ˈi.ter/", type: "noun", mastery: 2, morphology: [{ part: "I-", meaning: "Go", type: "root" }, { part: "-ter", meaning: "Suffix", type: "suffix" }], usage: { sentence: "Iter longum.", translation: "Long journey." }, grammar_tags: ["3rd Declension"] },
+      { id: 'i2', front: "Via", back: "Road", ipa: "/ˈwi.a/", type: "noun", mastery: 4, morphology: [{ part: "Vi-", meaning: "Way", type: "root" }, { part: "-a", meaning: "Fem.", type: "suffix" }], usage: { sentence: "Via Appia.", translation: "The Appian Way." }, grammar_tags: ["1st Declension"] }
     ]
   }
 };
@@ -110,12 +136,14 @@ const INITIAL_SYSTEM_LESSONS = [
     id: 'l1',
     title: "Salutationes",
     subtitle: "Greetings in the Forum",
-    description: "Learn how to greet friends and elders.",
+    description: "Learn how to greet friends and elders in the Roman Forum.",
     xp: 50,
     vocab: ['Salve', 'Vale', 'Quid agis?'],
     dialogue: [
       { speaker: "Marcus", text: "Salve, Iulia!", translation: "Hello, Julia!", side: "left" },
-      { speaker: "Iulia", text: "Salve, Marce.", translation: "Hello, Marcus.", side: "right" }
+      { speaker: "Iulia", text: "Salve, Marce. Quid agis?", translation: "Hello, Marcus. How are you?", side: "right" },
+      { speaker: "Marcus", text: "Bene sum. Et tu?", translation: "I am well. And you?", side: "left" },
+      { speaker: "Iulia", text: "Optime! Vale!", translation: "Great! Goodbye!", side: "right" }
     ],
     quiz: {
       question: "How do you say 'Hello' to a group?",
@@ -130,6 +158,7 @@ const TYPE_COLORS = {
   noun: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
   adverb: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
   phrase: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
+  adjective: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' },
 };
 
 // --- SHARED COMPONENTS ---
@@ -144,7 +173,13 @@ const Navigation = ({ activeTab, setActiveTab }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3 flex justify-between items-center z-50 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
       {tabs.map((tab) => (
-        <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center space-y-1 transition-all duration-200 ${activeTab === tab.id ? 'text-indigo-600 scale-105' : 'text-slate-400'}`}>
+        <button
+          key={tab.id}
+          onClick={() => setActiveTab(tab.id)}
+          className={`flex flex-col items-center space-y-1 transition-all duration-200 ${
+            activeTab === tab.id ? 'text-indigo-600 scale-105' : 'text-slate-400'
+          }`}
+        >
           <tab.icon size={24} strokeWidth={activeTab === tab.id ? 2.5 : 2} />
           <span className="text-[10px] font-bold tracking-wide uppercase">{tab.label}</span>
         </button>
@@ -156,7 +191,9 @@ const Navigation = ({ activeTab, setActiveTab }) => {
 const Header = ({ title, subtitle, rightAction, onClickTitle }) => (
   <div className="px-6 pt-12 pb-6 bg-white sticky top-0 z-40 border-b border-slate-100 flex justify-between items-end">
     <div onClick={onClickTitle} className={onClickTitle ? "cursor-pointer active:opacity-60 transition-opacity" : ""}>
-      <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">{title} {onClickTitle && <ChevronDown size={20} className="text-slate-400" />}</h1>
+      <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+        {title} {onClickTitle && <ChevronDown size={20} className="text-slate-400" />}
+      </h1>
       {subtitle && <p className="text-sm text-slate-500 mt-1 font-medium">{subtitle}</p>}
     </div>
     {rightAction}
@@ -171,7 +208,11 @@ const CardBuilderView = ({ onSaveCard }) => {
   const handleSubmit = (e) => { 
     e.preventDefault(); 
     if (!formData.front) return; 
-    onSaveCard({ ...formData, ipa: "/.../", mastery: 0, morphology: [{ part: formData.front, meaning: "Custom", type: "root" }], usage: { sentence: "-", translation: "-" }, grammar_tags: ["Custom"] }); 
+    onSaveCard({ 
+      ...formData, ipa: "/.../", mastery: 0, 
+      morphology: [{ part: formData.front, meaning: "Custom", type: "root" }], 
+      usage: { sentence: "-", translation: "-" }, grammar_tags: ["Custom"] 
+    }); 
     setFormData({ front: '', back: '', type: 'noun' }); 
     alert("Card Created!");
   };
@@ -186,7 +227,9 @@ const CardBuilderView = ({ onSaveCard }) => {
 };
 
 const LessonBuilderView = ({ data, setData, onSave }) => {
-  const updateDialogue = (idx, field, val) => { const newD = [...data.dialogue]; newD[idx][field] = val; setData({ ...data, dialogue: newD }); };
+  const updateDialogue = (idx, field, val) => { 
+    const newD = [...data.dialogue]; newD[idx][field] = val; setData({ ...data, dialogue: newD }); 
+  };
   const addLine = () => setData({ ...data, dialogue: [...data.dialogue, { speaker: '', text: '', translation: '', side: 'left' }] });
   const handleSave = () => { if (!data.title) return alert("Title required"); onSave({ ...data, vocab: data.vocab.split(',').map(s => s.trim()), xp: 100 }); };
   return (
