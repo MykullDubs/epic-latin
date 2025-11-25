@@ -58,7 +58,10 @@ import {
   ArrowRight,
   LayoutDashboard,
   ArrowLeft,
-  Library
+  Library,
+  Eye,
+  AlignLeft,
+  HelpCircle
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -114,15 +117,26 @@ const INITIAL_SYSTEM_LESSONS = [
     description: "Learn how to greet friends and elders.",
     xp: 50,
     vocab: ['Salve', 'Vale', 'Quid agis?'],
-    dialogue: [
-      { speaker: "Marcus", text: "Salve, Iulia!", translation: "Hello, Julia!", side: "left" },
-      { speaker: "Iulia", text: "Salve, Marce.", translation: "Hello, Marcus.", side: "right" }
-    ],
-    quiz: {
-      question: "How do you say 'Hello' to a group?",
-      options: [{ id: 'a', text: "Salve" }, { id: 'b', text: "Salvete" }, { id: 'c', text: "Vale" }],
-      correctId: 'b'
-    }
+    blocks: [
+      {
+        type: 'text',
+        title: 'The Basics',
+        content: 'In Latin, we distinguish between addressing one person ("Salve") and multiple people ("Salvete").'
+      },
+      {
+        type: 'dialogue',
+        lines: [
+          { speaker: "Marcus", text: "Salve, Iulia!", translation: "Hello, Julia!", side: "left" },
+          { speaker: "Iulia", text: "Salve, Marce.", translation: "Hello, Marcus.", side: "right" }
+        ]
+      },
+      {
+        type: 'quiz',
+        question: "How do you say 'Hello' to a group?",
+        options: [{ id: 'a', text: "Salve" }, { id: 'b', text: "Salvete" }, { id: 'c', text: "Vale" }],
+        correctId: 'b'
+      }
+    ]
   }
 ];
 
@@ -131,7 +145,6 @@ const TYPE_COLORS = {
   noun: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
   adverb: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
   phrase: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
-  adjective: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' }
 };
 
 // --- SHARED COMPONENTS ---
@@ -168,165 +181,151 @@ const Header = ({ title, subtitle, rightAction, onClickTitle }) => (
 // --- BUILDER COMPONENTS ---
 
 const CardBuilderView = ({ onSaveCard }) => {
-  const [formData, setFormData] = useState({
-    front: '', 
-    back: '', 
-    type: 'noun',
-    ipa: '',
-    sentence: '',
-    sentenceTrans: '',
-    grammarTags: ''
-  });
-  
-  // Morphology state
-  const [morphology, setMorphology] = useState([]);
-  const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
-
+  const [formData, setFormData] = useState({ front: '', back: '', type: 'noun' });
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-
-  const addMorphology = () => {
-    if (newMorphPart.part && newMorphPart.meaning) {
-      setMorphology([...morphology, newMorphPart]);
-      setNewMorphPart({ part: '', meaning: '', type: 'root' });
-    }
-  };
-
-  const removeMorphology = (index) => {
-    setMorphology(morphology.filter((_, i) => i !== index));
-  };
-
   const handleSubmit = (e) => { 
     e.preventDefault(); 
-    if (!formData.front || !formData.back) return; 
-    
+    if (!formData.front) return; 
     onSaveCard({ 
-      front: formData.front,
-      back: formData.back,
-      type: formData.type,
-      ipa: formData.ipa || "/.../",
-      mastery: 0,
-      morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }],
-      usage: { 
-        sentence: formData.sentence || "-", 
-        translation: formData.sentenceTrans || "-" 
-      },
-      grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"]
+      ...formData, ipa: "/.../", mastery: 0, 
+      morphology: [{ part: formData.front, meaning: "Custom", type: "root" }], 
+      usage: { sentence: "-", translation: "-" }, grammar_tags: ["Custom"] 
     }); 
-    
-    // Reset
-    setFormData({ front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }); 
-    setMorphology([]);
+    setFormData({ front: '', back: '', type: 'noun' }); 
     alert("Card Created!");
   };
-
   return (
-    <div className="px-6 mt-4 space-y-6 pb-20">
-      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800">
-        <p className="font-bold flex items-center gap-2"><Layers size={16}/> Advanced Card Creator</p>
-        <p className="opacity-80 text-xs mt-1">Define deep linguistic data for your flashcards.</p>
-      </div>
-
-      {/* Basic Info */}
-      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Core Data</h3>
-        <div className="grid grid-cols-2 gap-4">
-           <div className="space-y-2">
-             <label className="text-xs font-bold text-slate-400">Latin Word</label>
-             <input name="front" value={formData.front} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="e.g. Bellum" />
-           </div>
-           <div className="space-y-2">
-             <label className="text-xs font-bold text-slate-400">English</label>
-             <input name="back" value={formData.back} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="e.g. War" />
-           </div>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-             <label className="text-xs font-bold text-slate-400">Part of Speech</label>
-             <select name="type" value={formData.type} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-white">
-               <option value="noun">Noun</option>
-               <option value="verb">Verb</option>
-               <option value="adjective">Adjective</option>
-               <option value="adverb">Adverb</option>
-               <option value="phrase">Phrase</option>
-             </select>
-           </div>
-           <div className="space-y-2">
-             <label className="text-xs font-bold text-slate-400">IPA / Pronunciation</label>
-             <input name="ipa" value={formData.ipa} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-mono text-sm" placeholder="/ˈbel.lum/" />
-           </div>
-        </div>
-      </section>
-
-      {/* Morphology Builder */}
-      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Morphology (Roots & Parts)</h3>
-        
-        <div className="flex gap-2 items-end">
-           <div className="flex-1 space-y-1">
-             <label className="text-[10px] font-bold text-slate-400">Part (Latin)</label>
-             <input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="Bell-" />
-           </div>
-           <div className="flex-1 space-y-1">
-             <label className="text-[10px] font-bold text-slate-400">Meaning</label>
-             <input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="War" />
-           </div>
-           <div className="w-24 space-y-1">
-             <label className="text-[10px] font-bold text-slate-400">Type</label>
-             <select value={newMorphPart.type} onChange={(e) => setNewMorphPart({...newMorphPart, type: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm bg-white">
-               <option value="root">Root</option>
-               <option value="prefix">Prefix</option>
-               <option value="suffix">Suffix</option>
-             </select>
-           </div>
-           <button onClick={addMorphology} type="button" className="bg-indigo-100 text-indigo-600 p-2 rounded-lg hover:bg-indigo-200"><Plus size={20}/></button>
-        </div>
-
-        <div className="flex flex-wrap gap-2 mt-2">
-          {morphology.map((m, i) => (
-            <div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full text-sm">
-              <span className="font-bold text-indigo-700">{m.part}</span>
-              <span className="text-slate-500 text-xs">({m.meaning})</span>
-              <button onClick={() => removeMorphology(i)} className="text-slate-300 hover:text-rose-500"><X size={14}/></button>
-            </div>
-          ))}
-          {morphology.length === 0 && <p className="text-xs text-slate-400 italic">No morphology parts added yet.</p>}
-        </div>
-      </section>
-
-      {/* Context & Grammar */}
-      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Context & Grammar</h3>
-        <div className="space-y-2">
-           <label className="text-xs font-bold text-slate-400">Example Sentence (Latin)</label>
-           <input name="sentence" value={formData.sentence} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 italic" placeholder="Si vis pacem, para bellum." />
-        </div>
-        <div className="space-y-2">
-           <label className="text-xs font-bold text-slate-400">Sentence Translation</label>
-           <input name="sentenceTrans" value={formData.sentenceTrans} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="If you want peace, prepare for war." />
-        </div>
-        <div className="space-y-2">
-           <label className="text-xs font-bold text-slate-400">Grammar Tags (comma separated)</label>
-           <input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="2nd Declension, Neuter, Abstract" />
-        </div>
-      </section>
-
-      <button onClick={handleSubmit} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Save Complete Card</button>
-    </div>
+    <form onSubmit={handleSubmit} className="px-6 mt-4 space-y-5">
+      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800 font-bold">Add cards to your custom deck.</div>
+      <div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase">Latin</label><input name="front" value={formData.front} onChange={handleChange} className="w-full p-4 rounded-xl border border-slate-200 font-bold" /></div>
+      <div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase">English</label><input name="back" value={formData.back} onChange={handleChange} className="w-full p-4 rounded-xl border border-slate-200" /></div>
+      <button type="submit" className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg"><Save size={20} className="inline mr-2"/>Create Card</button>
+    </form>
   );
 };
 
 const LessonBuilderView = ({ data, setData, onSave }) => {
-  const updateDialogue = (idx, field, val) => { 
-    const newD = [...data.dialogue]; newD[idx][field] = val; setData({ ...data, dialogue: newD }); 
+  // Helper to update specific blocks
+  const updateBlock = (index, field, value) => {
+    const newBlocks = [...(data.blocks || [])];
+    newBlocks[index] = { ...newBlocks[index], [field]: value };
+    setData({ ...data, blocks: newBlocks });
   };
-  const addLine = () => setData({ ...data, dialogue: [...data.dialogue, { speaker: '', text: '', translation: '', side: 'left' }] });
+
+  const updateDialogueLine = (blockIndex, lineIndex, field, value) => {
+    const newBlocks = [...(data.blocks || [])];
+    newBlocks[blockIndex].lines[lineIndex][field] = value;
+    setData({ ...data, blocks: newBlocks });
+  };
+
+  const addBlock = (type) => {
+    const baseBlock = type === 'dialogue' ? { type: 'dialogue', lines: [{ speaker: 'A', text: '', translation: '', side: 'left' }] }
+      : type === 'quiz' ? { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' }
+      : { type: 'text', title: '', content: '' }; // text
+    
+    setData({ ...data, blocks: [...(data.blocks || []), baseBlock] });
+  };
+
+  const removeBlock = (index) => {
+    const newBlocks = [...(data.blocks || [])].filter((_, i) => i !== index);
+    setData({ ...data, blocks: newBlocks });
+  };
+
   const handleSave = () => { if (!data.title) return alert("Title required"); onSave({ ...data, vocab: data.vocab.split(',').map(s => s.trim()), xp: 100 }); };
+
   return (
-    <div className="px-6 mt-4 space-y-6">
-      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm"><h3 className="font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> Basics</h3><input className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="Title" value={data.title} onChange={e => setData({...data, title: e.target.value})} /><textarea className="w-full p-3 rounded-lg border border-slate-200" placeholder="Description" value={data.description} onChange={e => setData({...data, description: e.target.value})} /><input className="w-full p-3 rounded-lg border border-slate-200" placeholder="Vocab (comma separated)" value={data.vocab} onChange={e => setData({...data, vocab: e.target.value})} /></section>
-      <section className="space-y-4"><h3 className="font-bold text-slate-800 flex items-center gap-2"><MessageSquare size={18} className="text-indigo-600"/> Dialogue</h3>{data.dialogue.map((line, i) => (<div key={i} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-2"><div className="flex gap-2 mb-2"><input className="flex-1 p-2 rounded border border-slate-100 text-xs font-bold" placeholder="Speaker" value={line.speaker} onChange={e => updateDialogue(i, 'speaker', e.target.value)} /><select className="p-2 rounded border border-slate-100 text-xs" value={line.side} onChange={e => updateDialogue(i, 'side', e.target.value)}><option value="left">Left</option><option value="right">Right</option></select></div><input className="w-full mb-2 p-2 rounded border border-slate-100 text-sm" placeholder="Latin" value={line.text} onChange={e => updateDialogue(i, 'text', e.target.value)} /></div>))}<button onClick={addLine} className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold flex items-center justify-center gap-2"><Plus size={18} /> Add Line</button></section>
-      <button onClick={handleSave} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg"><Save size={20} className="inline mr-2"/> Save Lesson</button>
+    <div className="px-6 mt-4 space-y-8 pb-20">
+      {/* Header Info */}
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> Lesson Metadata</h3>
+        <input className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="Title" value={data.title} onChange={e => setData({...data, title: e.target.value})} />
+        <textarea className="w-full p-3 rounded-lg border border-slate-200 text-sm" placeholder="Description" value={data.description} onChange={e => setData({...data, description: e.target.value})} />
+        <input className="w-full p-3 rounded-lg border border-slate-200 text-sm" placeholder="Vocab (comma separated)" value={data.vocab} onChange={e => setData({...data, vocab: e.target.value})} />
+      </section>
+
+      {/* Blocks Editor */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2"><Layers size={18} className="text-indigo-600"/> Content Blocks</h3>
+          <span className="text-xs text-slate-400">{(data.blocks || []).length} Blocks</span>
+        </div>
+
+        {(data.blocks || []).map((block, idx) => (
+          <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative group">
+            <div className="absolute right-4 top-4 flex gap-2">
+               <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-2 py-1 rounded">{block.type}</span>
+               <button onClick={() => removeBlock(idx)} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>
+            </div>
+
+            {/* TEXT BLOCK EDITOR */}
+            {block.type === 'text' && (
+              <div className="space-y-3 mt-4">
+                <input className="w-full p-2 border-b border-slate-100 font-bold text-sm focus:outline-none" placeholder="Section Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
+                <textarea className="w-full p-2 bg-slate-50 rounded-lg text-sm min-h-[80px]" placeholder="Content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
+              </div>
+            )}
+
+            {/* DIALOGUE BLOCK EDITOR */}
+            {block.type === 'dialogue' && (
+               <div className="space-y-3 mt-6">
+                 {block.lines.map((line, lIdx) => (
+                   <div key={lIdx} className="flex gap-2 text-sm">
+                     <input className="w-16 p-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold" placeholder="Speaker" value={line.speaker} onChange={e => updateDialogueLine(idx, lIdx, 'speaker', e.target.value)} />
+                     <div className="flex-1 space-y-1">
+                       <input className="w-full p-1 border-b border-slate-100" placeholder="Latin" value={line.text} onChange={e => updateDialogueLine(idx, lIdx, 'text', e.target.value)} />
+                       <input className="w-full p-1 text-xs text-slate-500 italic" placeholder="English" value={line.translation} onChange={e => updateDialogueLine(idx, lIdx, 'translation', e.target.value)} />
+                     </div>
+                   </div>
+                 ))}
+                 <button onClick={() => {
+                    const newLines = [...block.lines, { speaker: 'B', text: '', translation: '', side: 'right' }];
+                    updateBlock(idx, 'lines', newLines);
+                 }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Add Line</button>
+               </div>
+            )}
+
+            {/* QUIZ BLOCK EDITOR */}
+            {block.type === 'quiz' && (
+              <div className="space-y-3 mt-4">
+                <input className="w-full p-2 bg-slate-50 rounded-lg font-bold text-sm" placeholder="Question" value={block.question} onChange={e => updateBlock(idx, 'question', e.target.value)} />
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Options (ID, Text)</p>
+                  {block.options.map((opt, oIdx) => (
+                    <div key={oIdx} className="flex gap-2">
+                      <input className="w-8 p-1 bg-slate-50 text-center text-xs" value={opt.id} readOnly />
+                      <input className="flex-1 p-1 border-b border-slate-100 text-sm" value={opt.text} onChange={(e) => {
+                        const newOpts = [...block.options]; newOpts[oIdx].text = e.target.value;
+                        updateBlock(idx, 'options', newOpts);
+                      }} />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 text-sm mt-2">
+                  <span className="text-slate-500">Correct ID:</span>
+                  <input className="w-10 p-1 bg-green-50 border border-green-200 rounded text-center font-bold text-green-700" value={block.correctId} onChange={e => updateBlock(idx, 'correctId', e.target.value)} />
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Add Block Buttons */}
+      <div className="grid grid-cols-3 gap-2">
+        <button onClick={() => addBlock('text')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50 hover:border-indigo-200 hover:text-indigo-600 transition-all">
+          <AlignLeft size={20}/> <span className="text-[10px] font-bold">Text</span>
+        </button>
+        <button onClick={() => addBlock('dialogue')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50 hover:border-indigo-200 hover:text-indigo-600 transition-all">
+          <MessageSquare size={20}/> <span className="text-[10px] font-bold">Dialogue</span>
+        </button>
+        <button onClick={() => addBlock('quiz')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50 hover:border-indigo-200 hover:text-indigo-600 transition-all">
+          <HelpCircle size={20}/> <span className="text-[10px] font-bold">Quiz</span>
+        </button>
+      </div>
+
+      <div className="pt-4 border-t border-slate-100">
+         <button onClick={handleSave} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform"><Save size={20} /> Save Lesson to Library</button>
+      </div>
     </div>
   );
 };
@@ -439,7 +438,7 @@ const ClassManagerView = ({ user, lessons }) => {
 
 const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, onSaveCard, onLogout }) => {
   const [view, setView] = useState('dashboard');
-  const [builderData, setBuilderData] = useState({ title: '', subtitle: '', description: '', vocab: '', dialogue: [{ speaker: '', text: '', translation: '', side: 'left' }], quiz: { question: 'Test Question', correctId: 'a', options: [{id:'a',text:'A'},{id:'b',text:'B'},{id:'c',text:'C'}] } });
+  const [builderData, setBuilderData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [builderMode, setBuilderMode] = useState('lesson');
 
   const NavItem = ({ id, icon: Icon, label }) => (
@@ -448,7 +447,12 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
     </button>
   );
 
-  const previewLesson = { ...builderData, vocab: builderData.vocab ? builderData.vocab.split(',').map(s => s.trim()) : [], xp: 100 };
+  const previewLesson = { 
+    ...builderData, 
+    vocab: builderData.vocab ? builderData.vocab.split(',').map(s => s.trim()) : [], 
+    xp: 100,
+    blocks: builderData.blocks || [] // Ensure blocks exist
+  };
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
@@ -471,10 +475,10 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
         {view === 'builder' && (
           <div className="h-full flex flex-col md:flex-row gap-6 animate-in fade-in duration-500">
             <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50"><div className="flex items-center gap-3"><h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText size={18} /> Creator</h3><div className="flex bg-slate-100 p-0.5 rounded-lg"><button onClick={() => setBuilderMode('lesson')} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'lesson' ? 'bg-white shadow-sm' : ''}`}>Lesson</button><button onClick={() => setBuilderMode('deck')} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'deck' ? 'bg-white shadow-sm' : ''}`}>Deck</button></div></div><button className="text-xs font-bold text-indigo-600 hover:underline" onClick={() => setBuilderData({ title: '', subtitle: '', description: '', vocab: '', dialogue: [{ speaker: '', text: '', translation: '', side: 'left' }], quiz: { question: '', correctId: 'a', options: [{id:'a',text:''},{id:'b',text:''},{id:'c',text:''}] } })}>Clear Form</button></div>
+              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50"><div className="flex items-center gap-3"><h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText size={18} /> Creator</h3><div className="flex bg-slate-100 p-0.5 rounded-lg"><button onClick={() => setBuilderMode('lesson')} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'lesson' ? 'bg-white shadow-sm' : ''}`}>Lesson</button><button onClick={() => setBuilderMode('deck')} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'deck' ? 'bg-white shadow-sm' : ''}`}>Deck</button></div></div><button className="text-xs font-bold text-indigo-600 hover:underline" onClick={() => setBuilderData({ title: '', subtitle: '', description: '', vocab: '', blocks: [] })}>Clear Form</button></div>
               <div className="flex-1 overflow-y-auto p-0">{builderMode === 'lesson' ? <LessonBuilderView data={builderData} setData={setBuilderData} onSave={(l) => { onSaveLesson(l); alert("Saved!"); }} /> : <CardBuilderView onSaveCard={onSaveCard} />}</div>
             </div>
-            {builderMode === 'lesson' && <div className="w-full md:w-[400px] bg-white rounded-[3rem] border-[8px] border-slate-900/10 shadow-xl overflow-hidden flex flex-col relative"><div className="flex-1 overflow-hidden bg-slate-50"><LessonView lesson={previewLesson} onFinish={() => alert("Preview")} /></div><div className="bg-slate-100 p-2 text-center text-xs text-slate-400 font-bold uppercase tracking-wider border-t border-slate-200">Student Preview</div></div>}
+            {builderMode === 'lesson' && <div className="w-full md:w-[400px] bg-white rounded-[3rem] border-[8px] border-slate-900/10 shadow-xl overflow-hidden flex flex-col relative"><div className="flex-1 overflow-hidden bg-slate-50"><LessonView lesson={previewLesson} onFinish={() => alert("Preview Finished")} /></div><div className="bg-slate-100 p-2 text-center text-xs text-slate-400 font-bold uppercase tracking-wider border-t border-slate-200">Student Preview</div></div>}
           </div>
         )}
       </div>
@@ -484,7 +488,7 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
 
 // --- BUILDER HUB (STUDENT) ---
 const BuilderHub = ({ onSaveCard, onSaveLesson }) => {
-  const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', dialogue: [{ speaker: '', text: '', translation: '', side: 'left' }], quiz: { question: '', correctId: 'a', options: [{id:'a',text:''},{id:'b',text:''},{id:'c',text:''}] } });
+  const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [mode, setMode] = useState('card'); 
   return (
     <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">{mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}{mode === 'card' && (<><div className="px-6 mt-2"><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button><button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button></div></div><CardBuilderView onSaveCard={onSaveCard} /></>)}{mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} />}</div>
@@ -563,19 +567,109 @@ const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData }) => (
 const LessonView = ({ lesson, onFinish }) => {
   const [step, setStep] = useState(0); 
   const [quizSelection, setQuizSelection] = useState(null);
+
   if (!lesson) return null;
 
+  // Handle Legacy vs New Block-based Lessons
+  const contentBlocks = lesson.blocks || [
+    { type: 'dialogue', lines: lesson.dialogue || [] },
+    { type: 'quiz', ...lesson.quiz }
+  ];
+  
+  const totalSteps = contentBlocks.length + 2; // Intro + Blocks + Outro
+
   const renderContent = () => {
-    if (step === 0) return <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500"><div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 text-center"><div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm">🎓</div><h2 className="text-xl font-bold text-indigo-900 mb-2">{lesson.title}</h2><p className="text-indigo-700/80 text-sm">{lesson.description}</p></div><div className="space-y-3"><h3 className="font-bold text-slate-400 text-xs uppercase tracking-wider">Key Vocabulary</h3>{lesson.vocab.map((phrase, i) => (<div key={i} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl shadow-sm"><Volume2 size={18} className="text-indigo-500" /><span className="font-medium text-slate-700">{phrase}</span></div>))}</div></div>;
-    if (step === 1) return <div className="space-y-4 animate-in fade-in duration-500">{lesson.dialogue.map((line, i) => (<div key={i} className={`flex ${line.side === 'right' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[80%] p-4 rounded-2xl text-sm shadow-sm ${line.side === 'right' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'}`}><p className="font-bold text-xs opacity-70 mb-1">{line.speaker}</p><p className="text-base font-medium mb-1">{line.text}</p><p className={`text-xs italic ${line.side === 'right' ? 'text-indigo-200' : 'text-slate-400'}`}>{line.translation}</p></div></div>))}</div>;
-    if (step === 2) return <div className="animate-in fade-in duration-500"><div className="bg-white p-6 rounded-3xl shadow-lg border border-slate-100 text-center mb-6"><Brain size={40} className="mx-auto text-indigo-500 mb-4" /><h3 className="text-lg font-bold text-slate-800 mb-2">Pop Quiz!</h3><p className="text-slate-600">{lesson.quiz.question}</p></div><div className="space-y-3">{lesson.quiz.options.map((opt) => (<button key={opt.id} onClick={() => setQuizSelection(opt.id)} className={`w-full p-4 rounded-xl border-2 font-bold text-left transition-all ${quizSelection === opt.id ? opt.id === lesson.quiz.correctId ? 'border-green-500 bg-green-50 text-green-700' : 'border-red-500 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-slate-600'}`}>{opt.text}</button>))}</div></div>;
-    if (step === 3) return <div className="text-center py-10 animate-in zoom-in duration-500"><div className="w-24 h-24 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6"><Award size={48} className="text-yellow-600" /></div><h2 className="text-3xl font-bold text-slate-900 mb-2">Optime!</h2><p className="text-slate-500 mb-8">Lesson Complete. +{lesson.xp} XP</p><button onClick={() => onFinish(lesson.xp)} className="bg-indigo-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:scale-105 transition-transform">Return Home</button></div>;
+    // 1. INTRO
+    if (step === 0) return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 text-center">
+          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm">🎓</div>
+          <h2 className="text-xl font-bold text-indigo-900 mb-2">{lesson.title}</h2>
+          <p className="text-indigo-700/80 text-sm">{lesson.description}</p>
+        </div>
+        {lesson.vocab && (
+          <div className="space-y-3">
+            <h3 className="font-bold text-slate-400 text-xs uppercase tracking-wider">Key Vocabulary</h3>
+            {lesson.vocab.map((phrase, i) => (<div key={i} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl shadow-sm"><Volume2 size={18} className="text-indigo-500" /><span className="font-medium text-slate-700">{phrase}</span></div>))}
+          </div>
+        )}
+      </div>
+    );
+
+    // 2. OUTRO
+    if (step === totalSteps - 1) return (
+      <div className="text-center py-10 animate-in zoom-in duration-500">
+        <div className="w-24 h-24 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6"><Award size={48} className="text-yellow-600" /></div>
+        <h2 className="text-3xl font-bold text-slate-900 mb-2">Optime!</h2>
+        <p className="text-slate-500 mb-8">Lesson Complete. +{lesson.xp} XP</p>
+        <button onClick={() => onFinish(lesson.xp)} className="bg-indigo-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:scale-105 transition-transform">Return Home</button>
+      </div>
+    );
+
+    // 3. DYNAMIC BLOCKS
+    const block = contentBlocks[step - 1];
+    if (!block) return null;
+
+    if (block.type === 'text') {
+      return (
+        <div className="space-y-4 animate-in fade-in duration-500">
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+            <h3 className="text-lg font-bold text-indigo-900 mb-2">{block.title}</h3>
+            <p className="text-slate-600 leading-relaxed">{block.content}</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (block.type === 'dialogue') {
+      return (
+        <div className="space-y-4 animate-in fade-in duration-500">
+          {block.lines.map((line, i) => (
+            <div key={i} className={`flex ${line.side === 'right' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[80%] p-4 rounded-2xl text-sm shadow-sm ${line.side === 'right' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'}`}>
+                <p className="font-bold text-xs opacity-70 mb-1">{line.speaker}</p>
+                <p className="text-base font-medium mb-1">{line.text}</p>
+                <p className={`text-xs italic ${line.side === 'right' ? 'text-indigo-200' : 'text-slate-400'}`}>{line.translation}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (block.type === 'quiz') {
+      return (
+        <div className="animate-in fade-in duration-500">
+          <div className="bg-white p-6 rounded-3xl shadow-lg border border-slate-100 text-center mb-6">
+            <Brain size={40} className="mx-auto text-indigo-500 mb-4" />
+            <h3 className="text-lg font-bold text-slate-800 mb-2">Pop Quiz!</h3>
+            <p className="text-slate-600">{block.question}</p>
+          </div>
+          <div className="space-y-3">
+            {block.options.map((opt) => (
+              <button key={opt.id} onClick={() => setQuizSelection(opt.id)} className={`w-full p-4 rounded-xl border-2 font-bold text-left transition-all ${quizSelection === opt.id ? opt.id === block.correctId ? 'border-green-500 bg-green-50 text-green-700' : 'border-red-500 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-slate-600'}`}>{opt.text}</button>
+            ))}
+          </div>
+        </div>
+      );
+    }
   };
+
   return (
     <div className="pb-24 min-h-full flex flex-col bg-slate-50">
       <Header title="Lectio" subtitle={lesson.title} rightAction={<button onClick={() => onFinish(0)}><X size={24} className="text-slate-400" /></button>} />
-      <div className="flex-1 px-6 mt-2 overflow-y-auto custom-scrollbar"><div className="flex gap-2 mb-8">{[0, 1, 2, 3].map(s => (<div key={s} className={`h-1.5 flex-1 rounded-full transition-colors duration-500 ${s <= step ? 'bg-indigo-600' : 'bg-slate-200'}`} />))}</div>{renderContent()}</div>
-      {step < 3 && <div className="p-6 bg-white border-t border-slate-100 sticky bottom-0 z-30 pb-safe"><button disabled={step === 2 && quizSelection !== lesson.quiz.correctId} onClick={() => setStep(step + 1)} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2">{step === 2 ? 'Finish Lesson' : 'Continue'} <ChevronRight size={20} /></button></div>}
+      <div className="flex-1 px-6 mt-2 overflow-y-auto custom-scrollbar">
+        <div className="flex gap-2 mb-8">
+           {[...Array(totalSteps)].map((_, i) => (<div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-500 ${i <= step ? 'bg-indigo-600' : 'bg-slate-200'}`} />))}
+        </div>
+        {renderContent()}
+      </div>
+      {step < totalSteps - 1 && (
+        <div className="p-6 bg-white border-t border-slate-100 sticky bottom-0 z-30 pb-safe">
+          {/* Disable continue only if on a quiz step and no correct answer selected (simplified logic for prototype) */}
+          <button onClick={() => { setQuizSelection(null); setStep(step + 1); }} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2">Continue <ChevronRight size={20} /></button>
+        </div>
+      )}
     </div>
   );
 };
@@ -722,6 +816,8 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  
+  // Data State
   const [systemDecks, setSystemDecks] = useState({});
   const [systemLessons, setSystemLessons] = useState([]);
   const [customCards, setCustomCards] = useState([]);
@@ -735,12 +831,15 @@ const App = () => {
   useEffect(() => { const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); }); return () => unsubscribe(); }, []);
   useEffect(() => {
     if (!user) { setUserData(null); return; }
+    // Always load system decks first to ensure content is available
+    setSystemDecks(INITIAL_SYSTEM_DECKS);
+    setSystemLessons(INITIAL_SYSTEM_LESSONS);
+
     const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => { if (docSnap.exists()) setUserData(docSnap.data()); else setUserData(DEFAULT_USER_DATA); });
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => { const d = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); }); if (Object.keys(d).length === 0) setSystemDecks(INITIAL_SYSTEM_DECKS); else setSystemDecks(d); });
-    const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => { const l = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (l.length === 0) setSystemLessons(INITIAL_SYSTEM_LESSONS); else setSystemLessons(l); });
-    return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); };
+    
+    return () => { unsubProfile(); unsubCards(); unsubLessons(); };
   }, [user]);
 
   const handleCreateCard = async (c) => { if(!user) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), c); setSelectedDeckKey('custom'); setActiveTab('flashcards'); };
@@ -749,7 +848,9 @@ const App = () => {
 
   if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
   if (!user) return <AuthView />;
-  if (userData?.role === 'instructor') return <InstructorDashboard user={user} userData={userData} allDecks={allDecks} lessons={lessons} onSaveLesson={handleCreateLesson} onSaveCard={handleCreateCard} onLogout={() => signOut(auth)} />;
+  if (!userData) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>; // Prevent race condition
+  
+  if (userData.role === 'instructor') return <InstructorDashboard user={user} userData={userData} allDecks={allDecks} lessons={lessons} onSaveLesson={handleCreateLesson} onSaveCard={handleCreateCard} onLogout={() => signOut(auth)} />;
 
   const renderStudentView = () => {
     switch (activeTab) {
