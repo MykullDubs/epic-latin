@@ -58,7 +58,8 @@ import {
   LayoutDashboard,
   Settings,
   MoreVertical,
-  Library // Added missing import
+  Library,
+  Eye
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION (EPIC LATIN) ---
@@ -88,7 +89,7 @@ const DEFAULT_USER_DATA = {
   level: "Novice",
   streak: 1,
   xp: 0,
-  // Role is now set dynamically during signup
+  role: 'student'
 };
 
 // --- INITIAL SEED DATA ---
@@ -286,7 +287,7 @@ const InstructorView = ({ user, allDecks, onSaveLesson, onSaveCard }) => {
         {subTab === 'builder' && (
           <div className="animate-in fade-in duration-300">
              <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800"><p className="font-bold flex items-center gap-2"><Brain size={16}/> Instructor Mode</p></div>
-             <LessonBuilderView onSave={(l) => { onSaveLesson(l); alert("Lesson Saved"); }} />
+             {/* The old builder view was here, now using the full dashboard one */}
           </div>
         )}
       </div>
@@ -298,6 +299,8 @@ const InstructorView = ({ user, allDecks, onSaveLesson, onSaveCard }) => {
 const InstructorDashboard = ({ user, userData, allDecks, onSaveLesson, onSaveCard, onLogout }) => {
   const [view, setView] = useState('dashboard'); // dashboard, classes, library, builder
   const [classes, setClasses] = useState([]);
+  // Builder state lifted up for preview
+  const [builderData, setBuilderData] = useState({ title: '', subtitle: '', description: '', vocab: '', dialogue: [{ speaker: '', text: '', translation: '', side: 'left' }], quiz: { question: '', correctId: 'a', options: [{id:'a', text:''}, {id:'b', text:''}, {id:'c', text:''}] } });
   
   // Listen for classes
   useEffect(() => {
@@ -317,6 +320,13 @@ const InstructorDashboard = ({ user, userData, allDecks, onSaveLesson, onSaveCar
       <span>{label}</span>
     </button>
   );
+
+  // Construct a preview lesson object compatible with LessonView
+  const previewLesson = {
+    ...builderData,
+    vocab: builderData.vocab ? builderData.vocab.split(',').map(s => s.trim()) : [],
+    xp: 100
+  };
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
@@ -458,25 +468,35 @@ const InstructorDashboard = ({ user, userData, allDecks, onSaveLesson, onSaveCar
             </div>
           )}
 
-          {/* BUILDER VIEW */}
+          {/* BUILDER VIEW WITH PREVIEW */}
           {view === 'builder' && (
             <div className="h-[calc(100vh-140px)] flex flex-col md:flex-row gap-6 animate-in fade-in duration-500">
               {/* Editor Side */}
               <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                   <h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText size={18} /> Lesson Editor</h3>
-                  <button className="text-xs font-bold text-indigo-600 hover:underline">Clear Form</button>
+                  <button className="text-xs font-bold text-indigo-600 hover:underline" onClick={() => setBuilderData({ title: '', subtitle: '', description: '', vocab: '', dialogue: [{ speaker: '', text: '', translation: '', side: 'left' }], quiz: { question: '', correctId: 'a', options: [{id:'a', text:''}, {id:'b', text:''}, {id:'c', text:''}] } })}>Clear Form</button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-0">
-                  <LessonBuilderView onSave={(l) => { onSaveLesson(l); alert("Lesson Saved to Library"); }} />
+                  <LessonBuilderView 
+                    data={builderData} 
+                    setData={setBuilderData} 
+                    onSave={(l) => { onSaveLesson(l); alert("Lesson Saved to Library"); }} 
+                  />
                 </div>
               </div>
 
-              {/* Preview Side (Placeholder for now) */}
-              <div className="w-full md:w-80 bg-slate-100 rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 p-6">
-                <Brain size={48} className="mb-4 opacity-50" />
-                <p className="text-center text-sm font-medium">Live Preview</p>
-                <p className="text-center text-xs mt-1">As you build, a preview of the student experience will appear here.</p>
+              {/* Preview Side */}
+              <div className="w-full md:w-[400px] bg-white rounded-[3rem] border-[8px] border-slate-900/10 shadow-xl overflow-hidden flex flex-col relative">
+                {/* Simulated Notch */}
+                <div className="absolute top-0 left-0 right-0 h-8 bg-white/0 z-50 pointer-events-none" />
+                {/* Reusing LessonView for Live Preview */}
+                <div className="flex-1 overflow-hidden bg-slate-50">
+                   <LessonView lesson={previewLesson} onFinish={() => alert("Preview Finished!")} />
+                </div>
+                <div className="bg-slate-100 p-2 text-center text-xs text-slate-400 font-bold uppercase tracking-wider border-t border-slate-200">
+                  Student Preview
+                </div>
               </div>
             </div>
           )}
@@ -493,7 +513,7 @@ const AuthView = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState('student'); // New state for role selection
+  const [role, setRole] = useState('student'); // Default role for new signups
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -511,7 +531,7 @@ const AuthView = () => {
           ...DEFAULT_USER_DATA,
           name: name || "Discipulus",
           email: user.email,
-          role: role // Store the selected role permanently
+          role: role // Explicitly save selected role
         });
       }
     } catch (err) { setError(err.message.replace('Firebase: ', '')); } 
@@ -527,7 +547,7 @@ const AuthView = () => {
             <>
               <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Name</label><div className="relative"><User className="absolute left-3 top-3.5 text-slate-400" size={20} /><input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Marcus Aurelius" required={!isLogin} /></div></div>
               
-              {/* Role Selection UI */}
+              {/* Role Selection */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">I am a...</label>
                 <div className="flex gap-3">
@@ -575,7 +595,6 @@ const ProfileView = ({ user, userData }) => {
           <h3 className="font-bold text-slate-900 text-sm ml-1">Account</h3>
           <button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border border-slate-200 text-rose-600 font-bold flex items-center justify-between active:bg-rose-50 transition-colors"><span>Sign Out</span><LogOut size={20} /></button>
           
-          {/* Admin zone kept for deployment purposes, but role switching removed */}
           <h3 className="font-bold text-slate-900 text-sm ml-1 mt-4">Admin Zone</h3>
           <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex items-center justify-between active:scale-95 transition-all shadow-lg"><div className="flex items-center gap-2">{deploying ? <Loader className="animate-spin" size={20} /> : <UploadCloud size={20} />}<span>Deploy System Content</span></div><Database size={20} className="opacity-50" /></button>
         </div>
@@ -802,9 +821,12 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) 
 };
 
 // --- BUILDER HUB (GENERIC) ---
-const LessonBuilderView = ({ onSave }) => {
-  const [data, setData] = useState({ title: '', subtitle: '', description: '', vocab: '', dialogue: [{ speaker: '', text: '', translation: '', side: 'left' }], quiz: { question: '', correctId: 'a', options: [{id:'a', text:''}, {id:'b', text:''}, {id:'c', text:''}] } });
-  const updateDialogue = (idx, field, val) => { const newD = [...data.dialogue]; newD[idx][field] = val; setData({ ...data, dialogue: newD }); };
+const LessonBuilderView = ({ data, setData, onSave }) => { // Props updated to receive state
+  const updateDialogue = (idx, field, val) => { 
+    const newD = [...data.dialogue]; 
+    newD[idx][field] = val; 
+    setData({ ...data, dialogue: newD }); 
+  };
   const addLine = () => setData({ ...data, dialogue: [...data.dialogue, { speaker: '', text: '', translation: '', side: 'left' }] });
   const removeLine = (idx) => setData({ ...data, dialogue: data.dialogue.filter((_, i) => i !== idx) });
   const updateOption = (idx, val) => { const newOpts = [...data.quiz.options]; newOpts[idx].text = val; setData({ ...data, quiz: { ...data.quiz, options: newOpts } }); };
@@ -822,7 +844,10 @@ const LessonBuilderView = ({ onSave }) => {
 
 // --- BUILDER HUB (STUDENT) ---
 const BuilderHub = ({ onSaveCard, onSaveLesson }) => {
+  // Local state for the student's lesson builder
+  const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', dialogue: [{ speaker: '', text: '', translation: '', side: 'left' }], quiz: { question: '', correctId: 'a', options: [{id:'a', text:''}, {id:'b', text:''}, {id:'c', text:''}] } });
   const [mode, setMode] = useState('card'); 
+  
   const CardForm = () => {
     const [formData, setFormData] = useState({ front: '', back: '', type: 'noun', sentence: '', translation: '' });
     const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -832,7 +857,7 @@ const BuilderHub = ({ onSaveCard, onSaveLesson }) => {
     );
   };
   return (
-    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">{mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}{mode === 'card' && (<><div className="px-6 mt-2"><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button><button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button></div></div><CardForm /></>)}{mode === 'lesson' && <LessonBuilderView onSave={onSaveLesson} />}</div>
+    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">{mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}{mode === 'card' && (<><div className="px-6 mt-2"><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button><button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button></div></div><CardForm /></>)}{mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} />}</div>
   );
 };
 
@@ -874,8 +899,12 @@ const App = () => {
     }
 
     const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => {
-      if (docSnap.exists()) setUserData(docSnap.data());
-      else setUserData(DEFAULT_USER_DATA);
+      if (docSnap.exists()) {
+        setUserData(docSnap.data());
+      } else {
+        // If no role is set (legacy user), default to student.
+        setUserData({ ...DEFAULT_USER_DATA, role: 'student' });
+      }
     });
 
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => {
