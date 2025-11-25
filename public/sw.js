@@ -1,9 +1,10 @@
-const CACHE_NAME = 'linguist-flow-v3';
+const CACHE_NAME = 'linguist-flow-v4';
 
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/logo192.png',
   'https://cdn.tailwindcss.com'
 ];
 
@@ -73,7 +74,10 @@ self.addEventListener('fetch', (event) => {
             if (cachedResponse) {
               return cachedResponse;
             }
-            // Optional: Return a custom offline page here if you have one
+            // 5. Critical for React Apps: If navigation fails, return index.html
+            if (event.request.mode === 'navigate') {
+              return caches.match('/index.html');
+            }
           });
       })
   );
