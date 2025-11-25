@@ -1,11 +1,17 @@
-const CACHE_NAME = 'linguist-flow-v4';
+const CACHE_NAME = 'linguist-flow-v5';
 
-const urlsToCache = [
+// 1. CRITICAL ASSETS: These MUST exist for the app to work offline.
+const CORE_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/logo192.png',
   'https://cdn.tailwindcss.com'
+];
+
+// 2. OPTIONAL ASSETS: These allow the SW to install even if they are missing (404).
+const OPTIONAL_ASSETS = [
+  '/logo192.png',
+  '/logo512.png'
 ];
 
 // Install SW
@@ -14,12 +20,18 @@ self.addEventListener('install', (event) => {
 
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Opened cache');
-        // We catch errors here so one missing file doesn't break the whole app
-        return cache.addAll(urlsToCache).catch(err => {
-          console.error('SW: Failed to cache some initial assets', err);
-        });
+      .then(async (cache) => {
+        console.log('SW: Opened cache');
+        
+        // First, cache critical files. If this fails, the SW fails (correct behavior).
+        await cache.addAll(CORE_ASSETS);
+        
+        // Next, TRY to cache optional files. If this fails, we catch it and continue.
+        try {
+          await cache.addAll(OPTIONAL_ASSETS);
+        } catch (err) {
+          console.warn('SW: Optional assets missing (e.g. icons). PWA functionality may be limited, but offline mode will work.', err);
+        }
       })
   );
 });
@@ -43,42 +55,31 @@ self.addEventListener('activate', (event) => {
 
 // Fetch Handler
 self.addEventListener('fetch', (event) => {
-  // 1. Ignore non-http requests (like chrome-extension://)
+  // Ignore non-http requests
   if (!event.request.url.startsWith('http')) return;
 
+  // Strategy: Network First, falling back to Cache
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // 2. Check if response is valid
-        if (!response || response.status !== 200) {
-          return response;
-        }
-
-        // 3. Clone response to save it to cache
-        const responseToCache = response.clone();
-
-        caches.open(CACHE_NAME)
-          .then((cache) => {
-            // Only cache GET requests
-            if (event.request.method === 'GET') {
-               cache.put(event.request, responseToCache);
-            }
+        // If valid network response, clone and cache it
+        if (response && response.status === 200 && event.request.method === 'GET') {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
           });
-
+        }
         return response;
       })
-      .catch(() => {
-        // 4. Network failed, fall back to cache
-        return caches.match(event.request)
-          .then((cachedResponse) => {
-            if (cachedResponse) {
-              return cachedResponse;
-            }
-            // 5. Critical for React Apps: If navigation fails, return index.html
-            if (event.request.mode === 'navigate') {
-              return caches.match('/index.html');
-            }
-          });
+      .catch(async () => {
+        // Network failed, try cache
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) return cachedResponse;
+
+        // Critical for React Apps: If navigation fails, return index.html
+        if (event.request.mode === 'navigate') {
+          return caches.match('/index.html');
+        }
       })
   );
 });
