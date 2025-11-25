@@ -19,7 +19,10 @@ import {
   increment,
   writeBatch,
   deleteDoc,
-  arrayUnion
+  arrayUnion,
+  query,
+  where,
+  collectionGroup
 } from "firebase/firestore";
 import { 
   BookOpen, 
@@ -477,7 +480,7 @@ const ClassManagerView = ({ user, lessons }) => {
   const [classes, setClasses] = useState([]);
   const [selectedClass, setSelectedClass] = useState(null);
   const [newClassName, setNewClassName] = useState('');
-  const [newStudentName, setNewStudentName] = useState('');
+  const [newStudentEmail, setNewStudentEmail] = useState('');
   const [assignModalOpen, setAssignModalOpen] = useState(false);
 
   useEffect(() => {
@@ -489,7 +492,14 @@ const ClassManagerView = ({ user, lessons }) => {
   const createClass = async (e) => {
     e.preventDefault();
     if (!newClassName.trim()) return;
-    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), { name: newClassName, code: Math.random().toString(36).substring(2, 8).toUpperCase(), students: [], assignments: [], created: Date.now() });
+    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), { 
+        name: newClassName, 
+        code: Math.random().toString(36).substring(2, 8).toUpperCase(), 
+        students: [], 
+        studentEmails: [], // Array to store emails for querying
+        assignments: [], 
+        created: Date.now() 
+    });
     setNewClassName('');
   };
 
@@ -502,16 +512,22 @@ const ClassManagerView = ({ user, lessons }) => {
 
   const addStudent = async (e) => {
     e.preventDefault();
-    if (!newStudentName || !selectedClass) return;
-    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { students: arrayUnion(newStudentName) });
-    setSelectedClass(prev => ({...prev, students: [...(prev.students || []), newStudentName]}));
-    setNewStudentName('');
+    if (!newStudentEmail || !selectedClass) return;
+    // Update both students (legacy display) and studentEmails (for querying)
+    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { 
+        students: arrayUnion(newStudentEmail),
+        studentEmails: arrayUnion(newStudentEmail)
+    });
+    setSelectedClass(prev => ({...prev, students: [...(prev.students || []), newStudentEmail]}));
+    setNewStudentEmail('');
   };
 
-  const assignLesson = async (lessonId) => {
+  const assignLesson = async (lesson) => {
     if (!selectedClass) return;
-    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { assignments: arrayUnion(lessonId) });
-    setSelectedClass(prev => ({...prev, assignments: [...(prev.assignments || []), lessonId]}));
+    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { 
+        assignments: arrayUnion(lesson) // Storing the full lesson object
+    });
+    setSelectedClass(prev => ({...prev, assignments: [...(prev.assignments || []), lesson]}));
     setAssignModalOpen(false);
   };
 
@@ -529,14 +545,13 @@ const ClassManagerView = ({ user, lessons }) => {
            <div className="space-y-4">
              <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
              {(!selectedClass.assignments || selectedClass.assignments.length === 0) && <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm">No lessons assigned yet.</div>}
-             {selectedClass.assignments?.map((lid, idx) => {
-                const l = lessons.find(ls => ls.id === lid) || INITIAL_SYSTEM_LESSONS.find(sl => sl.id === lid);
-                return l ? (<div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center"><div><h4 className="font-bold text-slate-800">{l.title}</h4></div><span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-xs font-bold">Active</span></div>) : null;
-             })}
+             {selectedClass.assignments?.map((l, idx) => (
+                 <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center"><div><h4 className="font-bold text-slate-800">{l.title}</h4></div><span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-xs font-bold">Active</span></div>
+             ))}
            </div>
            <div className="space-y-4">
              <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Roster</h3>
-             <form onSubmit={addStudent} className="flex gap-2"><input value={newStudentName} onChange={e => setNewStudentName(e.target.value)} placeholder="Student Name" className="flex-1 p-2 rounded-lg border border-slate-200 text-sm" /><button type="submit" className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2 rounded-lg"><Plus size={18}/></button></form>
+             <form onSubmit={addStudent} className="flex gap-2"><input value={newStudentEmail} onChange={e => setNewStudentEmail(e.target.value)} placeholder="Student Email" className="flex-1 p-2 rounded-lg border border-slate-200 text-sm" /><button type="submit" className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2 rounded-lg"><Plus size={18}/></button></form>
              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">{(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}{selectedClass.students?.map((s, i) => (<div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center gap-3"><div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0)}</div><span className="text-sm font-medium text-slate-700">{s}</span></div>))}</div>
            </div>
         </div>
@@ -546,7 +561,7 @@ const ClassManagerView = ({ user, lessons }) => {
               <div className="p-4 border-b border-slate-100 flex justify-between items-center"><h3 className="font-bold text-lg">Select Lesson</h3><button onClick={() => setAssignModalOpen(false)}><X size={20} className="text-slate-400"/></button></div>
               <div className="flex-1 overflow-y-auto p-2">
                 {[...INITIAL_SYSTEM_LESSONS, ...lessons].map(l => (
-                  <button key={l.id} onClick={() => assignLesson(l.id)} className="w-full text-left p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-transparent hover:border-slate-100"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></button>
+                  <button key={l.id} onClick={() => assignLesson(l)} className="w-full text-left p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-transparent hover:border-slate-100"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></button>
                 ))}
               </div>
             </div>
@@ -893,10 +908,62 @@ const ProfileView = ({ user, userData }) => {
 const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData }) => (
   <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full">
     <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." />
+    
     <div className="px-6 space-y-6 mt-4">
-      <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl"><div className="flex justify-between"><div><p className="text-rose-100 text-sm font-bold uppercase">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp} XP</h3></div><Zap size={28} className="text-yellow-400 fill-current"/></div><div className="mt-6 bg-black/20 rounded-full h-3"><div className="bg-yellow-400 h-full w-3/4 rounded-full"/></div></div>
-      <div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3><div className="space-y-3">{lessons.map(l => (<button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-14 w-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700"><PlayCircle size={28}/></div><div className="text-left"><h4 className="font-bold text-slate-900">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div></div><ChevronRight className="text-slate-300"/></button>))}</div></div>
-      <div className="grid grid-cols-2 gap-4"><button onClick={() => setActiveTab('flashcards')} className="p-5 bg-orange-50 rounded-2xl border border-orange-100 text-center"><Layers className="mx-auto text-orange-500 mb-2"/><span className="block font-bold text-slate-800">Repetitio</span></button><button onClick={() => setActiveTab('create')} className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 text-center"><Feather className="mx-auto text-emerald-500 mb-2"/><span className="block font-bold text-slate-800">Scriptorium</span></button></div>
+      {/* Stat Card */}
+      <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl shadow-rose-200 relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition-transform duration-700" />
+        <div className="flex justify-between items-start relative z-10">
+          <div><p className="text-rose-100 font-medium mb-1 text-sm uppercase tracking-wider">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp || 0} <span className="text-lg font-sans font-normal text-rose-200">XP</span></h3></div>
+          <div className="bg-white/10 p-2.5 rounded-xl backdrop-blur-md border border-white/20"><Zap size={28} className="text-yellow-400" fill="currentColor" /></div>
+        </div>
+        <div className="mt-6 bg-black/20 rounded-full h-3 w-full overflow-hidden"><div className="bg-gradient-to-r from-yellow-300 to-amber-500 h-full w-[75%] rounded-full" /></div>
+        <div className="flex justify-between mt-3 text-xs font-medium text-rose-100"><span>Rank: Centurion</span><span>{userData?.streak || 1} Dies Igne 🔥</span></div>
+      </div>
+
+      {/* Class Assignments Section */}
+      {userData?.classAssignments && userData.classAssignments.length > 0 && (
+        <div>
+          <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><School size={18} className="text-indigo-600"/> Class Assignments</h3>
+          <div className="space-y-3">
+            {userData.classAssignments.map(l => (
+               <button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-indigo-50 border border-indigo-100 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all">
+                  <div className="flex items-center space-x-4">
+                    <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center text-indigo-600"><PlayCircle size={20} /></div>
+                    <div className="text-left"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-indigo-600/70">Assigned Lesson</p></div>
+                  </div>
+                  <ChevronRight size={20} className="text-indigo-300" />
+               </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600" /> Available Lessons</h3>
+        <div className="space-y-3">
+          {lessons.map(lesson => (
+            <button key={lesson.id} onClick={() => onSelectLesson(lesson)} className="w-full bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:shadow-md group">
+              <div className="flex items-center space-x-4">
+                <div className="h-14 w-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700 group-hover:bg-amber-200 transition-colors"><PlayCircle size={28} /></div>
+                <div className="text-left"><h4 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{lesson.title}</h4><p className="text-xs text-slate-500">{lesson.subtitle || 'Custom Lesson'}</p></div>
+              </div>
+              <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-600 transition-colors" />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <button onClick={() => setActiveTab('flashcards')} className="p-5 bg-orange-50 rounded-2xl border border-orange-100 flex flex-col items-center justify-center text-center space-y-3 hover:bg-orange-100 active:scale-95 transition-all">
+          <div className="bg-white p-3 rounded-full shadow-sm"><Layers className="text-orange-500" size={24} /></div>
+          <div><span className="block font-bold text-slate-800">Repetitio</span><span className="text-xs text-slate-500">Smart Deck</span></div>
+        </button>
+        <button onClick={() => setActiveTab('create')} className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 flex flex-col items-center justify-center text-center space-y-3 hover:bg-emerald-100 active:scale-95 transition-all">
+          <div className="bg-white p-3 rounded-full shadow-sm"><Feather className="text-emerald-500" size={24} /></div>
+          <div><span className="block font-bold text-slate-800">Scriptorium</span><span className="text-xs text-slate-500">Build Content</span></div>
+        </button>
+      </div>
     </div>
   </div>
 );
@@ -1096,7 +1163,7 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) 
     });
     setQuickAddData({ front: '', back: '', type: 'noun' });
     setSearchTerm(''); 
-    // Removed basic alert, parent handles feedback or we can add toast here if needed
+    alert("Card Added!");
   };
 
   if (!card && !manageMode) return <div className="h-full flex flex-col bg-slate-50"><Header title={currentDeck?.title || "Empty Deck"} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<button onClick={() => setManageMode(true)} className="p-2 bg-slate-100 rounded-full"><List size={20} className="text-slate-600" /></button>} /><div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400"><Layers size={48} className="mb-4 opacity-20" /><p>This deck is empty.</p><button onClick={() => setManageMode(true)} className="mt-4 text-indigo-600 font-bold text-sm">Add Cards</button></div></div>;
@@ -1204,6 +1271,8 @@ const App = () => {
   const [customLessons, setCustomLessons] = useState([]);
   const [activeLesson, setActiveLesson] = useState(null);
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
+  const [enrolledClasses, setEnrolledClasses] = useState([]);
+  const [classLessons, setClassLessons] = useState([]);
 
   // Derived Data: MERGE custom cards into system decks if they belong there, or keep them in 'custom'
   const allDecks = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
@@ -1229,9 +1298,10 @@ const App = () => {
       }
   });
 
-  const lessons = [...systemLessons, ...customLessons];
+  const lessons = [...systemLessons, ...customLessons, ...classLessons];
 
   useEffect(() => { const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); }); return () => unsubscribe(); }, []);
+  
   useEffect(() => {
     if (!user) { setUserData(null); return; }
     // Always load system decks first to ensure content is available
@@ -1241,8 +1311,28 @@ const App = () => {
     const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => { if (docSnap.exists()) setUserData(docSnap.data()); else setUserData(DEFAULT_USER_DATA); });
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => { const d = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); }); if (Object.keys(d).length === 0) setSystemDecks(INITIAL_SYSTEM_DECKS); else setSystemDecks(d); });
+    const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => { const l = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (l.length === 0) setSystemLessons(INITIAL_SYSTEM_LESSONS); else setSystemLessons(l); });
     
-    return () => { unsubProfile(); unsubCards(); unsubLessons(); };
+    // Enrolled Classes Listener
+    const qEnrolled = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
+    const unsubClasses = onSnapshot(qEnrolled, (snapshot) => {
+        const cls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setEnrolledClasses(cls);
+        // Extract assignments
+        const newAssignments = [];
+        cls.forEach(c => {
+            if (c.assignments && Array.isArray(c.assignments)) {
+                newAssignments.push(...c.assignments);
+            }
+        });
+        // Dedup by ID if needed, but simple push is fine for now
+        setClassLessons(newAssignments);
+        // Update user profile local state for UI
+        setUserData(prev => ({...prev, classAssignments: newAssignments}));
+    });
+
+    return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); unsubClasses(); };
   }, [user]);
 
   // CRUD HANDLERS
