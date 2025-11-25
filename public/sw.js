@@ -1,4 +1,4 @@
-const CACHE_NAME = 'linguist-flow-v5';
+const CACHE_NAME = 'linguist-flow-v6'; // Version bump to force clearing the "poisoned" cache
 
 // 1. CRITICAL ASSETS: These MUST exist for the app to work offline.
 const CORE_ASSETS = [
@@ -21,7 +21,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(async (cache) => {
-        console.log('SW: Opened cache');
+        console.log('SW: Opened cache v6');
         
         // First, cache critical files. If this fails, the SW fails (correct behavior).
         await cache.addAll(CORE_ASSETS);
