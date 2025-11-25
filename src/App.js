@@ -99,7 +99,8 @@ const INITIAL_SYSTEM_DECKS = {
     title: "👋 Salutationes",
     cards: [
       { id: 's1', front: "Salve", back: "Hello (Singular)", ipa: "/ˈsal.weː/", type: "phrase", mastery: 4, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-e", meaning: "Imp. Sing.", type: "suffix" }], usage: { sentence: "Salve, Marce!", translation: "Hello, Marcus!" }, grammar_tags: ["Imperative", "Greeting"] },
-      { id: 's2', front: "Salvete", back: "Hello (Plural)", ipa: "/salˈweː.te/", type: "phrase", mastery: 3, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-ete", meaning: "Imp. Pl.", type: "suffix" }], usage: { sentence: "Salvete, discipuli!", translation: "Hello, students!" }, grammar_tags: ["Imperative", "Greeting"] }
+      { id: 's2', front: "Salvete", back: "Hello (Plural)", ipa: "/salˈweː.te/", type: "phrase", mastery: 3, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-ete", meaning: "Imp. Pl.", type: "suffix" }], usage: { sentence: "Salvete, discipuli!", translation: "Hello, students!" }, grammar_tags: ["Imperative", "Greeting"] },
+      { id: 's3', front: "Vale", back: "Goodbye", ipa: "/ˈwa.leː/", type: "phrase", mastery: 3, morphology: [{ part: "Val-", meaning: "Be strong", type: "root" }, { part: "-e", meaning: "Imp.", type: "suffix" }], usage: { sentence: "Vale, amice.", translation: "Goodbye, friend." }, grammar_tags: ["Valediction"] }
     ]
   },
   medicina: {
@@ -118,15 +119,26 @@ const INITIAL_SYSTEM_LESSONS = [
     description: "Learn how to greet friends and elders.",
     xp: 50,
     vocab: ['Salve', 'Vale', 'Quid agis?'],
-    dialogue: [
-      { speaker: "Marcus", text: "Salve, Iulia!", translation: "Hello, Julia!", side: "left" },
-      { speaker: "Iulia", text: "Salve, Marce.", translation: "Hello, Marcus.", side: "right" }
-    ],
-    quiz: {
-      question: "How do you say 'Hello' to a group?",
-      options: [{ id: 'a', text: "Salve" }, { id: 'b', text: "Salvete" }, { id: 'c', text: "Vale" }],
-      correctId: 'b'
-    }
+    blocks: [
+      {
+        type: 'text',
+        title: 'The Basics',
+        content: 'In Latin, we distinguish between addressing one person ("Salve") and multiple people ("Salvete").'
+      },
+      {
+        type: 'dialogue',
+        lines: [
+          { speaker: "Marcus", text: "Salve, Iulia!", translation: "Hello, Julia!", side: "left" },
+          { speaker: "Iulia", text: "Salve, Marce.", translation: "Hello, Marcus.", side: "right" }
+        ]
+      },
+      {
+        type: 'quiz',
+        question: "How do you say 'Hello' to a group?",
+        options: [{ id: 'a', text: "Salve" }, { id: 'b', text: "Salvete" }, { id: 'c', text: "Vale" }],
+        correctId: 'b'
+      }
+    ]
   }
 ];
 
@@ -195,7 +207,6 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
   const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
   const [toastMsg, setToastMsg] = useState(null);
 
-  // Update deck selection if initialDeckId changes
   useEffect(() => {
     if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId}));
   }, [initialDeckId]);
@@ -269,11 +280,13 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
       
       <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800">
         <p className="font-bold flex items-center gap-2"><Layers size={16}/> Advanced Card Creator</p>
+        <p className="opacity-80 text-xs mt-1">Define deep linguistic data (X-Ray) for your flashcards.</p>
       </div>
 
       <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
         <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Core Data</h3>
         
+        {/* DECK SELECTOR */}
         <div className="space-y-2">
             <label className="text-xs font-bold text-slate-400">Target Deck</label>
             <select name="deckId" value={formData.deckId} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900">
@@ -340,7 +353,10 @@ const LessonBuilderView = ({ data, setData, onSave }) => {
   
   const handleSave = () => { 
     if (!data.title) return alert("Title required"); 
-    onSave({ ...data, vocab: data.vocab.split(',').map(s => s.trim()), xp: 100 }); 
+    // FIXED: Handle potential array vocab by joining if needed, or just fallback
+    const processedVocab = Array.isArray(data.vocab) ? data.vocab : (typeof data.vocab === 'string' ? data.vocab.split(',').map(s => s.trim()) : []);
+
+    onSave({ ...data, vocab: processedVocab, xp: 100 }); 
     setToastMsg("Lesson Saved Successfully");
   };
 
@@ -478,7 +494,12 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
   const [editingId, setEditingId] = useState(null); // Track editing
 
   const handleEditLesson = (lesson) => {
-      setBuilderData(lesson);
+      // FIX: Ensure vocab is a string for the edit form
+      const safeLesson = {
+          ...lesson,
+          vocab: Array.isArray(lesson.vocab) ? lesson.vocab.join(', ') : (lesson.vocab || '')
+      };
+      setBuilderData(safeLesson);
       setEditingId(lesson.id);
       setBuilderMode('lesson');
       setView('builder');
@@ -486,7 +507,7 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
 
   const handleSaveWithEdit = (data) => {
       if (editingId) {
-          onSaveLesson({ ...data }, editingId); // Assume update logic handled in app wrapper
+          onSaveLesson({ ...data }, editingId); 
       } else {
           onSaveLesson(data);
       }
@@ -494,12 +515,10 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
       setEditingId(null);
   };
   
-  // For now, simple deck "edit" just goes to card builder with that deck selected
   const handleEditDeck = (deckId) => {
       setBuilderMode('deck');
-      // Pass deckId to card builder via props (need to update CardBuilderView to accept initialDeckId)
-      // We will pass deckId via a ref or context in a real app, here we can use a small hack or prop
-      // Let's just switch view for now.
+      // We switch view, passing deckId would require Prop drilling or context. 
+      // For now, user manually selects deck in builder.
       setView('builder'); 
   };
 
@@ -510,9 +529,10 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
     </button>
   );
 
+  // FIX: Handle preview vocab gracefully whether string or array
   const previewLesson = { 
     ...builderData, 
-    vocab: builderData.vocab ? builderData.vocab.split(',').map(s => s.trim()) : [], 
+    vocab: typeof builderData.vocab === 'string' ? builderData.vocab.split(',').map(s => s.trim()) : (builderData.vocab || []), 
     xp: 100,
     blocks: builderData.blocks || [] 
   };
@@ -522,13 +542,7 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
       <div className="w-64 bg-white border-r border-slate-200 flex flex-col p-6 hidden md:flex">
         <div className="flex items-center gap-3 mb-10 px-2"><div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg"><GraduationCap size={24} /></div><div><h1 className="font-bold text-lg leading-none">LinguistFlow</h1><span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Magister Mode</span></div></div>
         <div className="space-y-2 flex-1"><NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" /><NavItem id="classes" icon={School} label="My Classes" /><NavItem id="library" icon={Library} label="Content Library" /><NavItem id="builder" icon={PlusCircle} label="Content Creator" /></div>
-        <div className="pt-6 border-t border-slate-100">
-          <div className="flex items-center gap-3 px-2 mb-4">
-            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs">{userData?.name?.charAt(0)}</div>
-            <div className="flex-1 overflow-hidden"><p className="text-sm font-bold truncate">{userData?.name}</p><p className="text-xs text-slate-400 truncate">{user.email}</p></div>
-          </div>
-          <button onClick={onLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><LogOut size={16} /> Sign Out</button>
-        </div>
+        <div className="pt-6 border-t border-slate-100"><button onClick={onLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><LogOut size={16} /> Sign Out</button></div>
       </div>
       <div className="flex-1 overflow-y-auto p-6 max-w-6xl mx-auto h-full">
         {view === 'dashboard' && (
@@ -908,7 +922,14 @@ const App = () => {
           if (!allDecks[target].cards) allDecks[target].cards = [];
           allDecks[target].cards.push(card);
       } else {
-          allDecks.custom.cards.push(card);
+          // If target deck doesn't exist in system decks (e.g. new custom deck), create it on fly for view
+          if (!allDecks[target] && target.startsWith('custom_')) {
+             // We need title from somewhere, usually stored in card or separate deck collection. 
+             // For simplicity, we use the ID or look for a title property if we saved one.
+             allDecks[target] = { title: card.deckTitle || "Custom Deck", cards: [] };
+          }
+          if (allDecks[target]) allDecks[target].cards.push(card);
+          else allDecks.custom.cards.push(card);
       }
   });
 
@@ -924,9 +945,6 @@ const App = () => {
     const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => { if (docSnap.exists()) setUserData(docSnap.data()); else setUserData(DEFAULT_USER_DATA); });
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    
-    // In a real app, we might fetch system content from Firestore public path, but hardcoded is safer for immediate stability
-    // const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), ...
     
     return () => { unsubProfile(); unsubCards(); unsubLessons(); };
   }, [user]);
