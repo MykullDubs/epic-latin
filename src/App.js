@@ -48,7 +48,7 @@ import {
   LogOut,
   Mail,
   Lock,
-  CloudUpload,
+  UploadCloud,
   Database,
   School,
   Users,
@@ -355,7 +355,7 @@ const ProfileView = ({ user, userData }) => {
           <h3 className="font-bold text-slate-900 text-sm ml-1">Account</h3>
           <button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border border-slate-200 text-rose-600 font-bold flex items-center justify-between active:bg-rose-50 transition-colors"><span>Sign Out</span><LogOut size={20} /></button>
           <h3 className="font-bold text-slate-900 text-sm ml-1 mt-4">Admin Zone</h3>
-          <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex items-center justify-between active:scale-95 transition-all shadow-lg"><div className="flex items-center gap-2">{deploying ? <Loader className="animate-spin" size={20} /> : <CloudUpload size={20} />}<span>Deploy System Content</span></div><Database size={20} className="opacity-50" /></button>
+          <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex items-center justify-between active:scale-95 transition-all shadow-lg"><div className="flex items-center gap-2">{deploying ? <Loader className="animate-spin" size={20} /> : <UploadCloud size={20} />}<span>Deploy System Content</span></div><Database size={20} className="opacity-50" /></button>
         </div>
       </div>
     </div>
