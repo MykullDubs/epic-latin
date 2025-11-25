@@ -98,7 +98,8 @@ const INITIAL_SYSTEM_DECKS = {
     title: "👋 Salutationes",
     cards: [
       { id: 's1', front: "Salve", back: "Hello (Singular)", ipa: "/ˈsal.weː/", type: "phrase", mastery: 4, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-e", meaning: "Imp. Sing.", type: "suffix" }], usage: { sentence: "Salve, Marce!", translation: "Hello, Marcus!" }, grammar_tags: ["Imperative", "Greeting"] },
-      { id: 's2', front: "Salvete", back: "Hello (Plural)", ipa: "/salˈweː.te/", type: "phrase", mastery: 3, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-ete", meaning: "Imp. Pl.", type: "suffix" }], usage: { sentence: "Salvete, discipuli!", translation: "Hello, students!" }, grammar_tags: ["Imperative", "Greeting"] }
+      { id: 's2', front: "Salvete", back: "Hello (Plural)", ipa: "/salˈweː.te/", type: "phrase", mastery: 3, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-ete", meaning: "Imp. Pl.", type: "suffix" }], usage: { sentence: "Salvete, discipuli!", translation: "Hello, students!" }, grammar_tags: ["Imperative", "Greeting"] },
+      { id: 's3', front: "Vale", back: "Goodbye", ipa: "/ˈwa.leː/", type: "phrase", mastery: 3, morphology: [{ part: "Val-", meaning: "Be strong", type: "root" }, { part: "-e", meaning: "Imp.", type: "suffix" }], usage: { sentence: "Vale, amice.", translation: "Goodbye, friend." }, grammar_tags: ["Valediction"] }
     ]
   },
   medicina: {
@@ -145,6 +146,7 @@ const TYPE_COLORS = {
   noun: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
   adverb: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
   phrase: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
+  adjective: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' }
 };
 
 // --- SHARED COMPONENTS ---
@@ -180,7 +182,7 @@ const Header = ({ title, subtitle, rightAction, onClickTitle }) => (
 
 // --- BUILDER COMPONENTS ---
 
-const CardBuilderView = ({ onSaveCard }) => {
+const CardBuilderView = ({ onSaveCard, availableDecks }) => {
   const [formData, setFormData] = useState({
     front: '', 
     back: '', 
@@ -188,10 +190,10 @@ const CardBuilderView = ({ onSaveCard }) => {
     ipa: '',
     sentence: '',
     sentenceTrans: '',
-    grammarTags: ''
+    grammarTags: '',
+    deckId: 'custom' // Default to custom/scriptorium
   });
   
-  // Morphology state
   const [morphology, setMorphology] = useState([]);
   const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
 
@@ -216,6 +218,7 @@ const CardBuilderView = ({ onSaveCard }) => {
       front: formData.front,
       back: formData.back,
       type: formData.type,
+      deckId: formData.deckId, // Pass the selected deck ID
       ipa: formData.ipa || "/.../",
       mastery: 0,
       morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }],
@@ -226,11 +229,14 @@ const CardBuilderView = ({ onSaveCard }) => {
       grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"]
     }); 
     
-    // Reset
-    setFormData({ front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }); 
+    // Reset form but keep deck selection
+    setFormData({ ...formData, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }); 
     setMorphology([]);
-    alert("Card Created with X-Ray Data!");
+    alert("Card Created!");
   };
+
+  // Prepare deck options
+  const deckOptions = availableDecks ? Object.entries(availableDecks).map(([key, deck]) => ({ id: key, title: deck.title })) : [];
 
   return (
     <div className="px-6 mt-4 space-y-6 pb-20">
@@ -242,6 +248,18 @@ const CardBuilderView = ({ onSaveCard }) => {
       {/* Basic Info */}
       <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
         <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Core Data</h3>
+        
+        {/* DECK SELECTOR */}
+        <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Target Deck</label>
+            <select name="deckId" value={formData.deckId} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900">
+              <option value="custom">✍️ Scriptorium (My Deck)</option>
+              {deckOptions.filter(d => d.id !== 'custom').map(d => (
+                  <option key={d.id} value={d.id}>{d.title}</option>
+              ))}
+            </select>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
            <div className="space-y-2">
              <label className="text-xs font-bold text-slate-400">Latin Word</label>
@@ -265,19 +283,18 @@ const CardBuilderView = ({ onSaveCard }) => {
              </select>
            </div>
            <div className="space-y-2">
-             <label className="text-xs font-bold text-slate-400">IPA / Pronunciation</label>
+             <label className="text-xs font-bold text-slate-400">IPA</label>
              <input name="ipa" value={formData.ipa} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-mono text-sm" placeholder="/ˈbel.lum/" />
            </div>
         </div>
       </section>
 
-      {/* Morphology Builder (The X-Ray Feature) */}
+      {/* Morphology Builder */}
       <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
         <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Morphology (X-Ray Data)</h3>
-        
         <div className="flex gap-2 items-end">
            <div className="flex-1 space-y-1">
-             <label className="text-[10px] font-bold text-slate-400">Part (Latin)</label>
+             <label className="text-[10px] font-bold text-slate-400">Part</label>
              <input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="Bell-" />
            </div>
            <div className="flex-1 space-y-1">
@@ -294,7 +311,6 @@ const CardBuilderView = ({ onSaveCard }) => {
            </div>
            <button type="button" onClick={addMorphology} className="bg-indigo-100 text-indigo-600 p-2 rounded-lg hover:bg-indigo-200"><Plus size={20}/></button>
         </div>
-
         <div className="flex flex-wrap gap-2 mt-2">
           {morphology.map((m, i) => (
             <div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full text-sm">
@@ -303,7 +319,7 @@ const CardBuilderView = ({ onSaveCard }) => {
               <button type="button" onClick={() => removeMorphology(i)} className="text-slate-300 hover:text-rose-500"><X size={14}/></button>
             </div>
           ))}
-          {morphology.length === 0 && <p className="text-xs text-slate-400 italic">No morphology parts added yet.</p>}
+          {morphology.length === 0 && <p className="text-xs text-slate-400 italic">No morphology parts added.</p>}
         </div>
       </section>
 
@@ -311,20 +327,20 @@ const CardBuilderView = ({ onSaveCard }) => {
       <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
         <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Context & Grammar</h3>
         <div className="space-y-2">
-           <label className="text-xs font-bold text-slate-400">Example Sentence (Latin)</label>
+           <label className="text-xs font-bold text-slate-400">Example Sentence</label>
            <input name="sentence" value={formData.sentence} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 italic" placeholder="Si vis pacem, para bellum." />
         </div>
         <div className="space-y-2">
-           <label className="text-xs font-bold text-slate-400">Sentence Translation</label>
+           <label className="text-xs font-bold text-slate-400">Translation</label>
            <input name="sentenceTrans" value={formData.sentenceTrans} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="If you want peace, prepare for war." />
         </div>
         <div className="space-y-2">
-           <label className="text-xs font-bold text-slate-400">Grammar Tags (comma separated)</label>
-           <input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="2nd Declension, Neuter, Abstract" />
+           <label className="text-xs font-bold text-slate-400">Grammar Tags</label>
+           <input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="2nd Declension, Neuter" />
         </div>
       </section>
 
-      <button onClick={handleSubmit} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Save Complete Card</button>
+      <button onClick={handleSubmit} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Save Card</button>
     </div>
   );
 };
@@ -576,7 +592,7 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
     ...builderData, 
     vocab: builderData.vocab ? builderData.vocab.split(',').map(s => s.trim()) : [], 
     xp: 100,
-    blocks: builderData.blocks || [] // Ensure blocks exist
+    blocks: builderData.blocks || [] 
   };
 
   return (
@@ -601,7 +617,7 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
           <div className="h-full flex flex-col md:flex-row gap-6 animate-in fade-in duration-500">
             <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50"><div className="flex items-center gap-3"><h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText size={18} /> Creator</h3><div className="flex bg-slate-100 p-0.5 rounded-lg"><button onClick={() => setBuilderMode('lesson')} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'lesson' ? 'bg-white shadow-sm' : ''}`}>Lesson</button><button onClick={() => setBuilderMode('deck')} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'deck' ? 'bg-white shadow-sm' : ''}`}>Deck</button></div></div><button className="text-xs font-bold text-indigo-600 hover:underline" onClick={() => setBuilderData({ title: '', subtitle: '', description: '', vocab: '', blocks: [] })}>Clear Form</button></div>
-              <div className="flex-1 overflow-y-auto p-0">{builderMode === 'lesson' ? <LessonBuilderView data={builderData} setData={setBuilderData} onSave={(l) => { onSaveLesson(l); alert("Saved!"); }} /> : <CardBuilderView onSaveCard={onSaveCard} />}</div>
+              <div className="flex-1 overflow-y-auto p-0">{builderMode === 'lesson' ? <LessonBuilderView data={builderData} setData={setBuilderData} onSave={(l) => { onSaveLesson(l); alert("Saved!"); }} /> : <CardBuilderView onSaveCard={onSaveCard} availableDecks={allDecks} />}</div>
             </div>
             {builderMode === 'lesson' && <div className="w-full md:w-[400px] bg-white rounded-[3rem] border-[8px] border-slate-900/10 shadow-xl overflow-hidden flex flex-col relative"><div className="flex-1 overflow-hidden bg-slate-50"><LessonView lesson={previewLesson} onFinish={() => alert("Preview Finished")} /></div><div className="bg-slate-100 p-2 text-center text-xs text-slate-400 font-bold uppercase tracking-wider border-t border-slate-200">Student Preview</div></div>}
           </div>
@@ -612,11 +628,11 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
 };
 
 // --- BUILDER HUB (STUDENT) ---
-const BuilderHub = ({ onSaveCard, onSaveLesson }) => {
+const BuilderHub = ({ onSaveCard, onSaveLesson, allDecks }) => {
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [mode, setMode] = useState('card'); 
   return (
-    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">{mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}{mode === 'card' && (<><div className="px-6 mt-2"><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button><button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button></div></div><CardBuilderView onSaveCard={onSaveCard} /></>)}{mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} />}</div>
+    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">{mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}{mode === 'card' && (<><div className="px-6 mt-2"><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button><button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button></div></div><CardBuilderView onSaveCard={onSaveCard} availableDecks={allDecks} /></>)}{mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} />}</div>
   );
 };
 
@@ -667,7 +683,7 @@ const ProfileView = ({ user, userData }) => {
     setDeploying(false);
   };
   const toggleRole = async () => {
-    if (!userData) return; // Guard clause
+    if (!userData) return; 
     const newRole = userData.role === 'instructor' ? 'student' : 'instructor';
     await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole });
   };
@@ -679,7 +695,7 @@ const ProfileView = ({ user, userData }) => {
 // --- HOME VIEW ---
 const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData }) => (
   <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full">
-    <Header title={`Ave, ${userData?.name}!`} subtitle="Perge in itinere tuo." />
+    <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." />
     <div className="px-6 space-y-6 mt-4">
       <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl"><div className="flex justify-between"><div><p className="text-rose-100 text-sm font-bold uppercase">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp} XP</h3></div><Zap size={28} className="text-yellow-400 fill-current"/></div><div className="mt-6 bg-black/20 rounded-full h-3"><div className="bg-yellow-400 h-full w-3/4 rounded-full"/></div></div>
       <div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3><div className="space-y-3">{lessons.map(l => (<button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-14 w-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700"><PlayCircle size={28}/></div><div className="text-left"><h4 className="font-bold text-slate-900">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div></div><ChevronRight className="text-slate-300"/></button>))}</div></div>
@@ -799,7 +815,7 @@ const LessonView = ({ lesson, onFinish }) => {
   );
 };
 
-// --- FLASHCARD VIEW (RESTORED) ---
+// --- FLASHCARD VIEW ---
 const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) => {
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [manageMode, setManageMode] = useState(false);
@@ -833,6 +849,7 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) 
     if(!quickAddData.front || !quickAddData.back) return;
     onSaveCard({
         ...quickAddData,
+        deckId: selectedDeckKey,
         ipa: "/.../",
         mastery: 0,
         morphology: [{ part: quickAddData.front, meaning: "Custom", type: "root" }],
@@ -950,7 +967,23 @@ const App = () => {
   const [activeLesson, setActiveLesson] = useState(null);
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
 
-  const allDecks = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: customCards } };
+  // Derived Data: MERGE custom cards into system decks if they belong there, or keep them in 'custom'
+  const allDecks = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
+  
+  // Ensure custom deck exists in derived state
+  if (!allDecks.custom) allDecks.custom = { title: "✍️ Scriptorium", cards: [] };
+
+  // Distribute Custom Cards
+  customCards.forEach(card => {
+      const target = card.deckId || 'custom';
+      if (allDecks[target]) {
+          if (!allDecks[target].cards) allDecks[target].cards = [];
+          allDecks[target].cards.push(card);
+      } else {
+          allDecks.custom.cards.push(card);
+      }
+  });
+
   const lessons = [...systemLessons, ...customLessons];
 
   useEffect(() => { const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); }); return () => unsubscribe(); }, []);
@@ -964,10 +997,13 @@ const App = () => {
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
+    // In a real app, we might fetch system content from Firestore public path, but hardcoded is safer for immediate stability
+    // const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), ...
+    
     return () => { unsubProfile(); unsubCards(); unsubLessons(); };
   }, [user]);
 
-  const handleCreateCard = async (c) => { if(!user) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), c); setSelectedDeckKey('custom'); setActiveTab('flashcards'); };
+  const handleCreateCard = async (c) => { if(!user) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), c); setSelectedDeckKey(c.deckId || 'custom'); setActiveTab('flashcards'); };
   const handleCreateLesson = async (l) => { if(!user) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), l); setActiveTab('home'); };
   const handleFinishLesson = async (xp) => { setActiveTab('home'); if (xp > 0 && user) { try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp) }); } catch (e) { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { ...DEFAULT_USER_DATA, xp }, { merge: true }); } } };
 
@@ -982,7 +1018,7 @@ const App = () => {
       case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} onSelectLesson={(l) => { setActiveLesson(l); setActiveTab('lesson'); }} userData={userData} />;
       case 'lesson': return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} />;
       case 'flashcards': return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} />;
-      case 'create': return <BuilderHub onSaveCard={handleCreateCard} onSaveLesson={handleCreateLesson} />;
+      case 'create': return <BuilderHub onSaveCard={handleCreateCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} />;
       case 'profile': return <ProfileView user={user} userData={userData} />;
       default: return <HomeView />;
     }
