@@ -65,7 +65,10 @@ import {
   Pencil,
   Image,
   Info,
-  Edit3
+  Edit3,
+  TrendingUp,
+  Activity,
+  Calendar
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -127,11 +130,6 @@ const INITIAL_SYSTEM_LESSONS = [
         type: 'text',
         title: 'The Basics',
         content: 'In Latin, we distinguish between addressing one person ("Salve") and multiple people ("Salvete").'
-      },
-      {
-        type: 'note',
-        title: 'Grammar Tip',
-        content: 'Latin uses different verb endings depending on who you are speaking to. This is called conjugation.'
       },
       {
         type: 'dialogue',
@@ -311,7 +309,6 @@ const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
 
   const deckOptions = availableDecks ? Object.entries(availableDecks).map(([key, deck]) => ({ id: key, title: deck.title })) : [];
   
-  // Get cards for the current selected deck to list them
   const currentDeckCards = availableDecks && availableDecks[formData.deckId] ? availableDecks[formData.deckId].cards : [];
 
   return (
@@ -626,6 +623,22 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
     blocks: builderData.blocks || [] 
   };
 
+  // Widget logic
+  const activeStudents = 24; // Placeholder for now
+  const recentActivity = [
+     { text: "Marcus finished 'Salutationes'", time: "2m", color: "bg-emerald-500" },
+     { text: "Julia joined 'Latin 101'", time: "15m", color: "bg-blue-500" },
+     { text: "New deck created", time: "1h", color: "bg-amber-500" },
+  ];
+
+  // Quick Actions
+  const quickAction = (label, icon, action) => (
+      <button onClick={action} className="flex flex-col items-center justify-center p-4 bg-white border border-slate-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all gap-2">
+          <div className="p-2 bg-indigo-100 text-indigo-600 rounded-full">{icon}</div>
+          <span className="text-xs font-bold text-slate-700">{label}</span>
+      </button>
+  );
+
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
       <div className="w-64 bg-white border-r border-slate-200 flex flex-col p-6 hidden md:flex">
@@ -641,7 +654,89 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
       </div>
       <div className="flex-1 overflow-y-auto p-6 max-w-6xl mx-auto h-full">
         {view === 'dashboard' && (
-           <div className="space-y-6 animate-in fade-in duration-500"><h2 className="text-2xl font-bold text-slate-800">Overview</h2><div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h3 className="text-3xl font-bold">Welcome Back</h3><p className="text-slate-400 text-xs font-bold uppercase">{userData.name}</p></div></div></div>
+            <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="flex justify-between items-center">
+               <h2 className="text-2xl font-bold text-slate-800">Dashboard</h2>
+               <span className="text-sm text-slate-500">{new Date().toLocaleDateString()}</span>
+            </div>
+       
+            {/* Top Stats Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div><p className="text-slate-400 text-xs font-bold uppercase">Active Students</p><h3 className="text-3xl font-bold text-slate-900 mt-1">{activeStudents}</h3></div>
+                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Users size={24}/></div>
+                  </div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div><p className="text-slate-400 text-xs font-bold uppercase">Total Classes</p><h3 className="text-3xl font-bold text-slate-900 mt-1">{lessons.length}</h3></div> {/* Using lessons length as placeholder or pass classes prop correctly */}
+                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><School size={24}/></div>
+                  </div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div><p className="text-slate-400 text-xs font-bold uppercase">Content Items</p><h3 className="text-3xl font-bold text-slate-900 mt-1">{Object.values(allDecks).reduce((acc, d) => acc + (d.cards?.length || 0), 0) + lessons.length}</h3></div>
+                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl"><Layers size={24}/></div>
+                  </div>
+                </div>
+            </div>
+       
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+               
+               {/* Left Column (2/3) */}
+               <div className="lg:col-span-2 space-y-6">
+                   
+                   {/* Quick Actions */}
+                   <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                       <h3 className="font-bold text-slate-800 mb-4">Quick Actions</h3>
+                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                           {quickAction("New Class", <Plus size={20}/>, () => setView('classes'))}
+                           {quickAction("New Lesson", <FileText size={20}/>, () => { setBuilderMode('lesson'); setView('builder'); })}
+                           {quickAction("New Deck", <Layers size={20}/>, () => { setBuilderMode('deck'); setView('builder'); })}
+                           {quickAction("Browse Lib", <Library size={20}/>, () => setView('library'))}
+                       </div>
+                   </div>
+       
+                   {/* Class Performance (Mock/Derived) */}
+                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                       <h3 className="font-bold text-slate-800 mb-4 flex items-center justify-between">
+                           <span>Class Engagement</span>
+                           <span className="text-xs font-normal text-slate-400">Students per Class</span>
+                       </h3>
+                       <div className="space-y-4">
+                           {/* Mock classes since we don't have classes prop here directly, need to fetch inside or pass down */}
+                           {/* For now, just a placeholder visual */}
+                           <div className="p-4 text-center text-slate-400 text-sm italic">No active class data available for chart.</div>
+                       </div>
+                    </div>
+       
+               </div>
+       
+               {/* Right Column (1/3) */}
+               <div className="space-y-6">
+                    {/* Recent Activity (Mock) */}
+                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-full">
+                       <h3 className="font-bold text-slate-800 mb-4">Live Feed</h3>
+                       <div className="space-y-0 relative">
+                           <div className="absolute left-3 top-2 bottom-2 w-0.5 bg-slate-100"></div>
+                           {recentActivity.map((item, i) => (
+                               <div key={i} className="flex gap-3 mb-6 relative z-10">
+                                   <div className={`w-6 h-6 rounded-full border-2 border-white shadow-sm flex-shrink-0 ${item.color}`}></div>
+                                   <div>
+                                       <p className="text-sm font-medium text-slate-700 leading-none">{item.text}</p>
+                                       <p className="text-xs text-slate-400 mt-1">{item.time} ago</p>
+                                   </div>
+                               </div>
+                           ))}
+                       </div>
+                       <button className="w-full py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 rounded-lg mt-2">View All Activity</button>
+                    </div>
+               </div>
+       
+            </div>
+          </div>
         )}
         {view === 'classes' && <ClassManagerView user={user} lessons={[...INITIAL_SYSTEM_LESSONS, ...lessons]} />}
         {view === 'library' && (
@@ -711,7 +806,9 @@ const AuthView = () => {
 // --- PROFILE VIEW ---
 const ProfileView = ({ user, userData }) => {
   const [deploying, setDeploying] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(false);
   const handleLogout = () => signOut(auth);
+
   const deploySystemContent = async () => {
     setDeploying(true); const batch = writeBatch(db);
     Object.entries(INITIAL_SYSTEM_DECKS).forEach(([key, deck]) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_decks', key), deck));
@@ -719,13 +816,48 @@ const ProfileView = ({ user, userData }) => {
     try { await batch.commit(); alert("Deployed!"); } catch (e) { alert("Error: " + e.message); }
     setDeploying(false);
   };
-  const toggleRole = async () => {
-    if (!userData) return; 
-    const newRole = userData.role === 'instructor' ? 'student' : 'instructor';
+
+  const changeRole = async (newRole) => {
+    setRoleLoading(true);
     await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }, { merge: true });
+    setRoleLoading(false);
   };
+
   return (
-    <div className="h-full flex flex-col bg-slate-50"><Header title="Ego" subtitle="Profile" /><div className="flex-1 px-6 mt-4"><div className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col items-center mb-6"><h2 className="text-2xl font-bold">{userData?.name}</h2><p className="text-sm text-slate-500">{user.email}</p><div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase">{userData?.role}</div></div><div className="space-y-3"><button onClick={toggleRole} className="w-full bg-white p-4 rounded-xl border text-slate-700 font-bold mb-4 flex justify-between"><span>Switch Role</span><School size={20} /></button><button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border text-rose-600 font-bold mb-4 flex justify-between"><span>Sign Out</span><LogOut/></button><button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex justify-between">{deploying ? <Loader className="animate-spin"/> : <UploadCloud/>}<span>Deploy Content</span></button></div></div></div>
+    <div className="h-full flex flex-col bg-slate-50">
+      <Header title="Ego" subtitle="Profile & Settings" />
+      <div className="flex-1 px-6 mt-4 overflow-y-auto">
+        <div className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col items-center mb-6">
+          <div className="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 mb-4 text-3xl font-bold">{userData?.name?.charAt(0)}</div>
+          <h2 className="text-2xl font-bold text-slate-900">{userData?.name}</h2>
+          <p className="text-sm text-slate-500">{user.email}</p>
+          <div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase">{userData?.role}</div>
+        </div>
+        
+        <div className="space-y-3">
+          <div className="bg-white p-4 rounded-xl border border-slate-200">
+            <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Current Role</label>
+            {roleLoading ? (
+              <div className="flex justify-center p-2"><Loader className="animate-spin text-indigo-600" /></div>
+            ) : (
+              <select 
+                value={userData?.role} 
+                onChange={(e) => changeRole(e.target.value)}
+                className="w-full p-2 bg-slate-50 rounded-lg font-bold text-slate-700 border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+              >
+                <option value="student">Student</option>
+                <option value="instructor">Instructor</option>
+              </select>
+            )}
+          </div>
+
+          <button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border text-rose-600 font-bold mb-4 flex justify-between items-center"><span>Sign Out</span><LogOut size={20}/></button>
+          
+          <h3 className="font-bold text-slate-900 text-sm ml-1 mt-4">Admin Zone</h3>
+          <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex justify-between items-center"><div className="flex items-center gap-2">{deploying ? <Loader className="animate-spin"/> : <UploadCloud/>}<span>Deploy System Content</span></div></button>
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -1004,7 +1136,30 @@ const App = () => {
   const [activeLesson, setActiveLesson] = useState(null);
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
 
-  const allDecks = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: customCards } };
+  // Derived Data: MERGE custom cards into system decks if they belong there, or keep them in 'custom'
+  const allDecks = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
+  
+  // Ensure custom deck exists in derived state
+  if (!allDecks.custom) allDecks.custom = { title: "✍️ Scriptorium", cards: [] };
+
+  // Distribute Custom Cards
+  customCards.forEach(card => {
+      const target = card.deckId || 'custom';
+      if (allDecks[target]) {
+          if (!allDecks[target].cards) allDecks[target].cards = [];
+          allDecks[target].cards.push(card);
+      } else {
+          // If target deck doesn't exist in system decks (e.g. new custom deck), create it on fly for view
+          if (!allDecks[target] && target.startsWith('custom_')) {
+             // We need title from somewhere, usually stored in card or separate deck collection. 
+             // For simplicity, we use the ID or look for a title property if we saved one.
+             allDecks[target] = { title: card.deckTitle || "Custom Deck", cards: [] };
+          }
+          if (allDecks[target]) allDecks[target].cards.push(card);
+          else allDecks.custom.cards.push(card);
+      }
+  });
+
   const lessons = [...systemLessons, ...customLessons];
 
   useEffect(() => { const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); }); return () => unsubscribe(); }, []);
