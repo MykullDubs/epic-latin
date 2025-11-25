@@ -54,7 +54,10 @@ import {
   Users,
   Copy,
   List,
-  ArrowRight
+  ArrowRight,
+  LayoutDashboard,
+  Settings,
+  MoreVertical
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION (EPIC LATIN) ---
@@ -84,7 +87,7 @@ const DEFAULT_USER_DATA = {
   level: "Novice",
   streak: 1,
   xp: 0,
-  role: 'student' 
+  role: 'student' // 'student' or 'instructor'
 };
 
 // --- INITIAL SEED DATA ---
@@ -160,7 +163,6 @@ const Navigation = ({ activeTab, setActiveTab }) => {
   const tabs = [
     { id: 'home', icon: Home, label: 'Domus' },
     { id: 'flashcards', icon: Layers, label: 'Chartae' },
-    { id: 'teach', icon: School, label: 'Magister' }, 
     { id: 'profile', icon: User, label: 'Ego' },
   ];
 
@@ -194,13 +196,12 @@ const Header = ({ title, subtitle, rightAction, onClickTitle }) => (
   </div>
 );
 
-// --- INSTRUCTOR (MAGISTER) VIEW ---
-const InstructorView = ({ user, allDecks, onSaveLesson, onSaveCard }) => {
-  const [subTab, setSubTab] = useState('classes');
+// --- INSTRUCTOR DASHBOARD (TABLET/PC OPTIMIZED) ---
+const InstructorDashboard = ({ user, userData, allDecks, onSaveLesson, onSaveCard, onLogout }) => {
+  const [view, setView] = useState('dashboard'); // dashboard, classes, library, builder
   const [classes, setClasses] = useState([]);
-  const [newClassName, setNewClassName] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-
+  
+  // Listen for classes
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'users', user.uid, 'classes');
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -209,83 +210,180 @@ const InstructorView = ({ user, allDecks, onSaveLesson, onSaveCard }) => {
     return () => unsubscribe();
   }, [user]);
 
-  const handleCreateClass = async (e) => {
-    e.preventDefault();
-    if (!newClassName.trim()) return;
-    const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), {
-      name: newClassName, code: joinCode, students: 0, created: Date.now()
-    });
-    setNewClassName('');
-  };
-
-  const handleDeleteClass = async (id) => {
-    if (window.confirm("Delete this class?")) {
-      await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id));
-    }
-  };
-
-  const allCards = Object.values(allDecks).flatMap(deck => deck.cards || []);
-  const filteredCards = allCards.filter(c => 
-    c.front.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.back.toLowerCase().includes(searchTerm.toLowerCase())
+  const NavItem = ({ id, icon: Icon, label }) => (
+    <button 
+      onClick={() => setView(id)}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${view === id ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+    >
+      <Icon size={20} />
+      <span>{label}</span>
+    </button>
   );
 
   return (
-    <div className="h-full flex flex-col bg-slate-50">
-      <Header title="Magister" subtitle="Instructor Dashboard" />
-      <div className="px-6 mt-2">
-        <div className="flex bg-slate-200 p-1 rounded-xl">
-           <button onClick={() => setSubTab('classes')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'classes' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Classes</button>
-           <button onClick={() => setSubTab('library')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'library' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Library</button>
-           <button onClick={() => setSubTab('builder')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'builder' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Builder</button>
+    <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
+      {/* SIDEBAR */}
+      <div className="w-64 bg-white border-r border-slate-200 flex flex-col p-6 hidden md:flex">
+        <div className="flex items-center gap-3 mb-10 px-2">
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+            <GraduationCap size={24} />
+          </div>
+          <div>
+            <h1 className="font-bold text-lg leading-none">LinguistFlow</h1>
+            <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Magister Mode</span>
+          </div>
+        </div>
+
+        <div className="space-y-2 flex-1">
+          <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
+          <NavItem id="classes" icon={School} label="My Classes" />
+          <NavItem id="library" icon={Library} label="Content Library" />
+          <NavItem id="builder" icon={PlusCircle} label="Lesson Builder" />
+        </div>
+
+        <div className="pt-6 border-t border-slate-100">
+          <div className="flex items-center gap-3 px-2 mb-4">
+            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs">
+              {userData?.name?.charAt(0)}
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <p className="text-sm font-bold truncate">{userData?.name}</p>
+              <p className="text-xs text-slate-400 truncate">{user.email}</p>
+            </div>
+          </div>
+          <button onClick={onLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+            <LogOut size={16} /> Sign Out
+          </button>
         </div>
       </div>
-      <div className="flex-1 px-6 mt-4 overflow-y-auto custom-scrollbar pb-24">
-        {subTab === 'classes' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <form onSubmit={handleCreateClass} className="flex gap-2">
-              <input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="flex-1 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500" />
-              <button type="submit" className="bg-indigo-600 text-white p-3 rounded-xl"><Plus /></button>
-            </form>
-            <div className="space-y-3">
-              {classes.map(cls => (
-                <div key={cls.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+
+      {/* MAIN CONTENT AREA */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Top Bar (Mobile only) */}
+        <div className="md:hidden bg-white border-b border-slate-200 p-4 flex justify-between items-center sticky top-0 z-20">
+          <div className="font-bold text-indigo-700 flex items-center gap-2"><GraduationCap/> Magister</div>
+          <button onClick={onLogout}><LogOut size={20} className="text-slate-400"/></button>
+        </div>
+
+        <div className="p-6 max-w-6xl mx-auto">
+          
+          {/* DASHBOARD VIEW */}
+          {view === 'dashboard' && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <h2 className="text-2xl font-bold text-slate-800">Overview</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                   <div className="flex justify-between items-start">
-                    <div>
-                        <h3 className="font-bold text-lg text-slate-900">{cls.name}</h3>
-                        <div className="flex items-center gap-2 mt-1">
-                            <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-mono tracking-wider flex items-center gap-1">
-                                {cls.code} <Copy size={10} className="cursor-pointer" onClick={() => navigator.clipboard.writeText(cls.code)}/>
-                            </span>
-                            <span className="text-xs text-slate-400 flex items-center gap-1">
-                                <Users size={12} /> {cls.students} Students
-                            </span>
-                        </div>
-                    </div>
-                    <button onClick={() => handleDeleteClass(cls.id)} className="text-slate-300 hover:text-rose-500"><Trash2 size={18}/></button>
+                    <div><p className="text-slate-400 text-xs font-bold uppercase">Active Students</p><h3 className="text-3xl font-bold text-slate-900 mt-1">24</h3></div>
+                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Users size={24}/></div>
                   </div>
                 </div>
-              ))}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div><p className="text-slate-400 text-xs font-bold uppercase">Total Classes</p><h3 className="text-3xl font-bold text-slate-900 mt-1">{classes.length}</h3></div>
+                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><School size={24}/></div>
+                  </div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div><p className="text-slate-400 text-xs font-bold uppercase">Content Items</p><h3 className="text-3xl font-bold text-slate-900 mt-1">{Object.values(allDecks).reduce((acc, d) => acc + (d.cards?.length || 0), 0)}</h3></div>
+                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl"><Layers size={24}/></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <h3 className="font-bold text-slate-800 mb-4">Recent Activity</h3>
+                  <div className="space-y-4">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="flex items-center gap-3 pb-3 border-b border-slate-50 last:border-0">
+                        <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                        <p className="text-sm text-slate-600 flex-1">Marcus completed <b>Salutationes</b> quiz</p>
+                        <span className="text-xs text-slate-400">2m ago</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
-        {subTab === 'library' && (
-          <div className="space-y-4 animate-in fade-in duration-300">
-            <div className="relative"><Search className="absolute left-3 top-3.5 text-slate-400" size={20} /><input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search cards..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm" /></div>
-            <div className="grid grid-cols-2 gap-3">
-              {filteredCards.slice(0, 10).map((card, idx) => (
-                <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm"><p className="font-bold text-slate-800">{card.front}</p><p className="text-xs text-slate-500">{card.back}</p></div>
-              ))}
+          )}
+
+          {/* CLASSES VIEW */}
+          {view === 'classes' && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-slate-800">My Classes</h2>
+                <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2"><Plus size={16}/> New Class</button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {classes.length === 0 && <div className="col-span-full p-12 text-center text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">No classes created yet.</div>}
+                {classes.map(cls => (
+                  <div key={cls.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow group relative">
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"><button className="text-slate-300 hover:text-indigo-600"><MoreVertical size={20}/></button></div>
+                    <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div>
+                    <h3 className="font-bold text-lg text-slate-900">{cls.name}</h3>
+                    <p className="text-sm text-slate-500 mb-4">{cls.students} Students Enrolled</p>
+                    <div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
+                      <span className="text-xs font-mono font-bold text-slate-600 tracking-wider">{cls.code}</span>
+                      <button className="text-indigo-600 text-xs font-bold flex items-center gap-1" onClick={() => navigator.clipboard.writeText(cls.code)}><Copy size={12}/> Copy Code</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-        {subTab === 'builder' && (
-          <div className="animate-in fade-in duration-300">
-             <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800"><p className="font-bold flex items-center gap-2"><Brain size={16}/> Instructor Mode</p></div>
-             <LessonBuilderView onSave={(l) => { onSaveLesson(l); alert("Lesson Saved"); }} />
-          </div>
-        )}
+          )}
+
+          {/* LIBRARY VIEW */}
+          {view === 'library' && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-slate-800">Content Library</h2>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                  <input placeholder="Search..." className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500" />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {Object.entries(allDecks).map(([key, deck]) => (
+                  <div key={key} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 transition-colors cursor-pointer">
+                    <div className="flex justify-between items-start mb-2">
+                      <Layers className="text-indigo-500" size={24} />
+                      <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-xs font-bold">{deck.cards?.length} Cards</span>
+                    </div>
+                    <h3 className="font-bold text-slate-900">{deck.title}</h3>
+                    <p className="text-xs text-slate-500 mt-1">System Deck</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* BUILDER VIEW */}
+          {view === 'builder' && (
+            <div className="h-[calc(100vh-140px)] flex flex-col md:flex-row gap-6 animate-in fade-in duration-500">
+              {/* Editor Side */}
+              <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                  <h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText size={18} /> Lesson Editor</h3>
+                  <button className="text-xs font-bold text-indigo-600 hover:underline">Clear Form</button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-0">
+                  <LessonBuilderView onSave={(l) => { onSaveLesson(l); alert("Lesson Saved to Library"); }} />
+                </div>
+              </div>
+
+              {/* Preview Side (Placeholder for now) */}
+              <div className="w-full md:w-80 bg-slate-100 rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 p-6">
+                <Brain size={48} className="mb-4 opacity-50" />
+                <p className="text-center text-sm font-medium">Live Preview</p>
+                <p className="text-center text-xs mt-1">As you build, a preview of the student experience will appear here.</p>
+              </div>
+            </div>
+          )}
+
+        </div>
       </div>
     </div>
   );
@@ -349,14 +447,26 @@ const ProfileView = ({ user, userData }) => {
     setDeploying(false);
   };
 
+  const toggleRole = async () => {
+    const newRole = userData.role === 'instructor' ? 'student' : 'instructor';
+    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole });
+  };
+
   return (
     <div className="h-full flex flex-col bg-slate-50">
       <Header title="Ego" subtitle="Profile & Settings" />
       <div className="flex-1 px-6 mt-4 overflow-y-auto">
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center mb-6"><div className="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 mb-4 text-3xl font-bold">{userData?.name?.charAt(0) || "D"}</div><h2 className="text-2xl font-bold text-slate-900">{userData?.name}</h2><p className="text-slate-500 text-sm flex items-center gap-1 mt-1"><Mail size={14} /> {user.email}</p><div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase tracking-wider">{userData?.level || "Novice"}</div></div>
         <div className="space-y-3">
-          <h3 className="font-bold text-slate-900 text-sm ml-1">Account</h3>
+          <h3 className="font-bold text-slate-900 text-sm ml-1">Role Management</h3>
+          <button onClick={toggleRole} className="w-full bg-white p-4 rounded-xl border border-slate-200 text-slate-700 font-bold flex items-center justify-between active:bg-slate-50 transition-colors">
+            <div className="flex items-center gap-2"><School size={20} className="text-indigo-600"/> <span>Switch to {userData.role === 'instructor' ? 'Student' : 'Instructor'} View</span></div>
+            <ChevronRight size={16} className="text-slate-400"/>
+          </button>
+
+          <h3 className="font-bold text-slate-900 text-sm ml-1 mt-4">Account</h3>
           <button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border border-slate-200 text-rose-600 font-bold flex items-center justify-between active:bg-rose-50 transition-colors"><span>Sign Out</span><LogOut size={20} /></button>
+          
           <h3 className="font-bold text-slate-900 text-sm ml-1 mt-4">Admin Zone</h3>
           <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex items-center justify-between active:scale-95 transition-all shadow-lg"><div className="flex items-center gap-2">{deploying ? <Loader className="animate-spin" size={20} /> : <UploadCloud size={20} />}<span>Deploy System Content</span></div><Database size={20} className="opacity-50" /></button>
         </div>
@@ -720,6 +830,10 @@ const App = () => {
     
     if (!user) return <AuthView />;
 
+    if (userData?.role === 'instructor') {
+      return <InstructorDashboard user={user} userData={userData} allDecks={allDecks} onSaveLesson={handleCreateLesson} onSaveCard={handleCreateCard} onLogout={() => signOut(auth)} />;
+    }
+
     switch (activeTab) {
       case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} onSelectLesson={(l) => { setActiveLesson(l); setActiveTab('lesson'); }} userData={userData} />;
       case 'lesson': return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} />;
@@ -733,10 +847,14 @@ const App = () => {
 
   return (
     <div className="bg-slate-100 min-h-screen font-sans text-slate-900 flex justify-center items-center p-0 sm:p-4">
-      <div className="bg-slate-50 w-full max-w-[400px] h-[100dvh] sm:h-[800px] sm:rounded-[3rem] shadow-2xl relative overflow-hidden border-[8px] border-slate-900/5 sm:border-slate-900/10">
-        <div className="absolute top-0 left-0 right-0 h-8 bg-white/0 z-50 pointer-events-none" />
+      <div className={`bg-slate-50 w-full h-[100dvh] shadow-2xl relative overflow-hidden border-[8px] border-slate-900/5 sm:border-slate-900/10 ${userData?.role === 'instructor' ? 'max-w-full sm:rounded-none border-0' : 'max-w-[400px] sm:rounded-[3rem] sm:h-[800px]'}`}>
+        {/* Dynamic Notch for Student Mode only */}
+        {userData?.role !== 'instructor' && <div className="absolute top-0 left-0 right-0 h-8 bg-white/0 z-50 pointer-events-none" />}
+        
         {renderView()}
-        {user && <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />}
+        
+        {/* Nav only for students */}
+        {user && userData?.role !== 'instructor' && <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />}
       </div>
       <style>{`
         .perspective-1000 { perspective: 1000px; }
