@@ -18,7 +18,8 @@ import {
   updateDoc, 
   increment,
   writeBatch,
-  deleteDoc
+  deleteDoc,
+  arrayUnion
 } from "firebase/firestore";
 import { 
   BookOpen, 
@@ -59,7 +60,8 @@ import {
   Settings,
   MoreVertical,
   Library,
-  Eye
+  Eye,
+  ArrowLeft
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION (EPIC LATIN) ---
@@ -199,11 +201,14 @@ const Header = ({ title, subtitle, rightAction, onClickTitle }) => (
 );
 
 // --- INSTRUCTOR (MAGISTER) VIEW ---
-const InstructorView = ({ user, allDecks, onSaveLesson, onSaveCard }) => {
+const InstructorView = ({ user, allDecks, lessons, onSaveLesson, onSaveCard }) => {
   const [subTab, setSubTab] = useState('classes');
   const [classes, setClasses] = useState([]);
+  const [selectedClass, setSelectedClass] = useState(null);
   const [newClassName, setNewClassName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [newStudentName, setNewStudentName] = useState('');
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
 
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'users', user.uid, 'classes');
@@ -218,7 +223,11 @@ const InstructorView = ({ user, allDecks, onSaveLesson, onSaveCard }) => {
     if (!newClassName.trim()) return;
     const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), {
-      name: newClassName, code: joinCode, students: 0, created: Date.now()
+      name: newClassName, 
+      code: joinCode, 
+      students: [], 
+      assignments: [], 
+      created: Date.now()
     });
     setNewClassName('');
   };
@@ -226,7 +235,28 @@ const InstructorView = ({ user, allDecks, onSaveLesson, onSaveCard }) => {
   const handleDeleteClass = async (id) => {
     if (window.confirm("Delete this class?")) {
       await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id));
+      if (selectedClass?.id === id) setSelectedClass(null);
     }
+  };
+
+  const handleAddStudent = async (e) => {
+    e.preventDefault();
+    if (!newStudentName || !selectedClass) return;
+    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), {
+      students: arrayUnion(newStudentName)
+    });
+    // Optimistic update for smoother UI
+    setSelectedClass(prev => ({...prev, students: [...(prev.students || []), newStudentName]}));
+    setNewStudentName('');
+  };
+
+  const handleAssignLesson = async (lessonId) => {
+    if (!selectedClass) return;
+    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), {
+      assignments: arrayUnion(lessonId)
+    });
+    setSelectedClass(prev => ({...prev, assignments: [...(prev.assignments || []), lessonId]}));
+    setAssignModalOpen(false);
   };
 
   const allCards = Object.values(allDecks).flatMap(deck => deck.cards || []);
@@ -237,272 +267,146 @@ const InstructorView = ({ user, allDecks, onSaveLesson, onSaveCard }) => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
-      <Header title="Magister" subtitle="Instructor Dashboard" />
-      <div className="px-6 mt-2">
-        <div className="flex bg-slate-200 p-1 rounded-xl">
-           <button onClick={() => setSubTab('classes')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'classes' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Classes</button>
-           <button onClick={() => setSubTab('library')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'library' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Library</button>
-           <button onClick={() => setSubTab('builder')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'builder' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Builder</button>
-        </div>
-      </div>
-      <div className="flex-1 px-6 mt-4 overflow-y-auto custom-scrollbar pb-24">
-        {subTab === 'classes' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <form onSubmit={handleCreateClass} className="flex gap-2">
-              <input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="flex-1 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500" />
-              <button type="submit" className="bg-indigo-600 text-white p-3 rounded-xl"><Plus /></button>
-            </form>
-            <div className="space-y-3">
-              {classes.map(cls => (
-                <div key={cls.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <div>
-                        <h3 className="font-bold text-lg text-slate-900">{cls.name}</h3>
-                        <div className="flex items-center gap-2 mt-1">
-                            <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-mono tracking-wider flex items-center gap-1">
-                                {cls.code} <Copy size={10} className="cursor-pointer" onClick={() => navigator.clipboard.writeText(cls.code)}/>
-                            </span>
-                            <span className="text-xs text-slate-400 flex items-center gap-1">
-                                <Users size={12} /> {cls.students} Students
-                            </span>
-                        </div>
+      {/* Show Class Detail or Main Dashboard */}
+      {selectedClass ? (
+        <div className="flex flex-col h-full">
+           <div className="px-6 pt-6 pb-4 bg-white border-b border-slate-100 sticky top-0 z-20">
+             <button onClick={() => setSelectedClass(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2"><ArrowLeft size={18} className="mr-1"/> Back to Classes</button>
+             <div className="flex justify-between items-end">
+               <div>
+                 <h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1>
+                 <p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p>
+               </div>
+               <button onClick={() => setAssignModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm"><Plus size={16}/> Assign</button>
+             </div>
+           </div>
+
+           <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Assignments Column */}
+              <div className="space-y-4">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
+                {(!selectedClass.assignments || selectedClass.assignments.length === 0) && <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm">No lessons assigned yet.</div>}
+                {selectedClass.assignments?.map((lid, idx) => {
+                   const l = lessons.find(ls => ls.id === lid);
+                   return l ? (
+                     <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+                        <div><h4 className="font-bold text-slate-800">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div>
+                        <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-xs font-bold">Active</span>
+                     </div>
+                   ) : null;
+                })}
+              </div>
+
+              {/* Roster Column */}
+              <div className="space-y-4">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Student Roster</h3>
+                <form onSubmit={handleAddStudent} className="flex gap-2">
+                  <input value={newStudentName} onChange={e => setNewStudentName(e.target.value)} placeholder="Add Student Name" className="flex-1 p-2 rounded-lg border border-slate-200 text-sm" />
+                  <button type="submit" className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2 rounded-lg"><Plus size={18}/></button>
+                </form>
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                  {(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}
+                  {selectedClass.students?.map((s, i) => (
+                    <div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center gap-3">
+                      <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0)}</div>
+                      <span className="text-sm font-medium text-slate-700">{s}</span>
                     </div>
-                    <button onClick={() => handleDeleteClass(cls.id)} className="text-slate-300 hover:text-rose-500"><Trash2 size={18}/></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {subTab === 'library' && (
-          <div className="space-y-4 animate-in fade-in duration-300">
-            <div className="relative"><Search className="absolute left-3 top-3.5 text-slate-400" size={20} /><input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search cards..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm" /></div>
-            <div className="grid grid-cols-2 gap-3">
-              {filteredCards.slice(0, 10).map((card, idx) => (
-                <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm"><p className="font-bold text-slate-800">{card.front}</p><p className="text-xs text-slate-500">{card.back}</p></div>
-              ))}
-            </div>
-          </div>
-        )}
-        {subTab === 'builder' && (
-          <div className="animate-in fade-in duration-300">
-             <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800"><p className="font-bold flex items-center gap-2"><Brain size={16}/> Instructor Mode</p></div>
-             {/* The old builder view was here, now using the full dashboard one */}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// --- INSTRUCTOR DASHBOARD (TABLET/PC OPTIMIZED) ---
-const InstructorDashboard = ({ user, userData, allDecks, onSaveLesson, onSaveCard, onLogout }) => {
-  const [view, setView] = useState('dashboard'); // dashboard, classes, library, builder
-  const [classes, setClasses] = useState([]);
-  // Builder state lifted up for preview
-  const [builderData, setBuilderData] = useState({ title: '', subtitle: '', description: '', vocab: '', dialogue: [{ speaker: '', text: '', translation: '', side: 'left' }], quiz: { question: '', correctId: 'a', options: [{id:'a', text:''}, {id:'b', text:''}, {id:'c', text:''}] } });
-  
-  // Listen for classes
-  useEffect(() => {
-    const q = collection(db, 'artifacts', appId, 'users', user.uid, 'classes');
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => unsubscribe();
-  }, [user]);
-
-  const NavItem = ({ id, icon: Icon, label }) => (
-    <button 
-      onClick={() => setView(id)}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${view === id ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
-    >
-      <Icon size={20} />
-      <span>{label}</span>
-    </button>
-  );
-
-  // Construct a preview lesson object compatible with LessonView
-  const previewLesson = {
-    ...builderData,
-    vocab: builderData.vocab ? builderData.vocab.split(',').map(s => s.trim()) : [],
-    xp: 100
-  };
-
-  return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
-      {/* SIDEBAR */}
-      <div className="w-64 bg-white border-r border-slate-200 flex flex-col p-6 hidden md:flex">
-        <div className="flex items-center gap-3 mb-10 px-2">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
-            <GraduationCap size={24} />
-          </div>
-          <div>
-            <h1 className="font-bold text-lg leading-none">LinguistFlow</h1>
-            <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Magister Mode</span>
-          </div>
-        </div>
-
-        <div className="space-y-2 flex-1">
-          <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
-          <NavItem id="classes" icon={School} label="My Classes" />
-          <NavItem id="library" icon={Library} label="Content Library" />
-          <NavItem id="builder" icon={PlusCircle} label="Lesson Builder" />
-        </div>
-
-        <div className="pt-6 border-t border-slate-100">
-          <div className="flex items-center gap-3 px-2 mb-4">
-            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs">
-              {userData?.name?.charAt(0)}
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-bold truncate">{userData?.name}</p>
-              <p className="text-xs text-slate-400 truncate">{user.email}</p>
-            </div>
-          </div>
-          <button onClick={onLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
-            <LogOut size={16} /> Sign Out
-          </button>
-        </div>
-      </div>
-
-      {/* MAIN CONTENT AREA */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Top Bar (Mobile only) */}
-        <div className="md:hidden bg-white border-b border-slate-200 p-4 flex justify-between items-center sticky top-0 z-20">
-          <div className="font-bold text-indigo-700 flex items-center gap-2"><GraduationCap/> Magister</div>
-          <button onClick={onLogout}><LogOut size={20} className="text-slate-400"/></button>
-        </div>
-
-        <div className="p-6 max-w-6xl mx-auto">
-          
-          {/* DASHBOARD VIEW */}
-          {view === 'dashboard' && (
-            <div className="space-y-6 animate-in fade-in duration-500">
-              <h2 className="text-2xl font-bold text-slate-800">Overview</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <div><p className="text-slate-400 text-xs font-bold uppercase">Active Students</p><h3 className="text-3xl font-bold text-slate-900 mt-1">24</h3></div>
-                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Users size={24}/></div>
-                  </div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <div><p className="text-slate-400 text-xs font-bold uppercase">Total Classes</p><h3 className="text-3xl font-bold text-slate-900 mt-1">{classes.length}</h3></div>
-                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><School size={24}/></div>
-                  </div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <div><p className="text-slate-400 text-xs font-bold uppercase">Content Items</p><h3 className="text-3xl font-bold text-slate-900 mt-1">{Object.values(allDecks).reduce((acc, d) => acc + (d.cards?.length || 0), 0)}</h3></div>
-                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl"><Layers size={24}/></div>
-                  </div>
+                  ))}
                 </div>
               </div>
+           </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                  <h3 className="font-bold text-slate-800 mb-4">Recent Activity</h3>
-                  <div className="space-y-4">
-                    {[1,2,3].map(i => (
-                      <div key={i} className="flex items-center gap-3 pb-3 border-b border-slate-50 last:border-0">
-                        <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
-                        <p className="text-sm text-slate-600 flex-1">Marcus completed <b>Salutationes</b> quiz</p>
-                        <span className="text-xs text-slate-400">2m ago</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* CLASSES VIEW */}
-          {view === 'classes' && (
-            <div className="space-y-6 animate-in fade-in duration-500">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-slate-800">My Classes</h2>
-                <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2"><Plus size={16}/> New Class</button>
-              </div>
+           {/* Assignment Modal */}
+           {assignModalOpen && (
+             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+               <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col">
+                 <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+                   <h3 className="font-bold text-lg">Select Lesson</h3>
+                   <button onClick={() => setAssignModalOpen(false)}><X size={20} className="text-slate-400"/></button>
+                 </div>
+                 <div className="flex-1 overflow-y-auto p-2">
+                   {lessons.map(l => (
+                     <button key={l.id} onClick={() => handleAssignLesson(l.id)} className="w-full text-left p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-transparent hover:border-slate-100">
+                       <h4 className="font-bold text-indigo-900">{l.title}</h4>
+                       <p className="text-xs text-slate-500">{l.subtitle}</p>
+                     </button>
+                   ))}
+                 </div>
+               </div>
+             </div>
+           )}
+        </div>
+      ) : (
+      <>
+        <Header title="Magister" subtitle="Instructor Dashboard" />
+        <div className="px-6 mt-2">
+          <div className="flex bg-slate-200 p-1 rounded-xl">
+             <button onClick={() => setSubTab('classes')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'classes' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Classes</button>
+             <button onClick={() => setSubTab('library')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'library' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Library</button>
+             <button onClick={() => setSubTab('builder')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${subTab === 'builder' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Builder</button>
+          </div>
+        </div>
+        <div className="flex-1 px-6 mt-4 overflow-y-auto custom-scrollbar pb-24">
+          {subTab === 'classes' && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <form onSubmit={handleCreateClass} className="flex gap-2">
+                <input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="flex-1 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500" />
+                <button type="submit" className="bg-indigo-600 text-white p-3 rounded-xl"><Plus /></button>
+              </form>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {classes.length === 0 && <div className="col-span-full p-12 text-center text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">No classes created yet.</div>}
                 {classes.map(cls => (
-                  <div key={cls.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow group relative">
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"><button className="text-slate-300 hover:text-indigo-600"><MoreVertical size={20}/></button></div>
+                  <div key={cls.id} onClick={() => setSelectedClass(cls)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative cursor-pointer">
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={(e) => {e.stopPropagation(); handleDeleteClass(cls.id);}} className="text-slate-300 hover:text-rose-500"><Trash2 size={18}/></button></div>
                     <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div>
                     <h3 className="font-bold text-lg text-slate-900">{cls.name}</h3>
-                    <p className="text-sm text-slate-500 mb-4">{cls.students} Students Enrolled</p>
+                    <p className="text-sm text-slate-500 mb-4">{(cls.students || []).length} Students Enrolled</p>
                     <div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
                       <span className="text-xs font-mono font-bold text-slate-600 tracking-wider">{cls.code}</span>
-                      <button className="text-indigo-600 text-xs font-bold flex items-center gap-1" onClick={() => navigator.clipboard.writeText(cls.code)}><Copy size={12}/> Copy Code</button>
+                      <button className="text-indigo-600 text-xs font-bold flex items-center gap-1" onClick={(e) => {e.stopPropagation(); navigator.clipboard.writeText(cls.code);}}><Copy size={12}/> Copy Code</button>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
           )}
-
-          {/* LIBRARY VIEW */}
-          {view === 'library' && (
-            <div className="space-y-6 animate-in fade-in duration-500">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-slate-800">Content Library</h2>
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-                  <input placeholder="Search..." className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500" />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {Object.entries(allDecks).map(([key, deck]) => (
-                  <div key={key} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 transition-colors cursor-pointer">
-                    <div className="flex justify-between items-start mb-2">
-                      <Layers className="text-indigo-500" size={24} />
-                      <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-xs font-bold">{deck.cards?.length} Cards</span>
+          {subTab === 'library' && (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              {/* Lessons Section */}
+              <div>
+                <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Interactive Lessons</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {lessons.map(l => (
+                    <div key={l.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+                      <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600"><PlayCircle size={20}/></div>
+                      <div><h4 className="font-bold text-slate-900">{l.title}</h4><p className="text-xs text-slate-500">{l.vocab.length} Words • {l.xp} XP</p></div>
                     </div>
-                    <h3 className="font-bold text-slate-900">{deck.title}</h3>
-                    <p className="text-xs text-slate-500 mt-1">System Deck</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* BUILDER VIEW WITH PREVIEW */}
-          {view === 'builder' && (
-            <div className="h-[calc(100vh-140px)] flex flex-col md:flex-row gap-6 animate-in fade-in duration-500">
-              {/* Editor Side */}
-              <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                  <h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText size={18} /> Lesson Editor</h3>
-                  <button className="text-xs font-bold text-indigo-600 hover:underline" onClick={() => setBuilderData({ title: '', subtitle: '', description: '', vocab: '', dialogue: [{ speaker: '', text: '', translation: '', side: 'left' }], quiz: { question: '', correctId: 'a', options: [{id:'a', text:''}, {id:'b', text:''}, {id:'c', text:''}] } })}>Clear Form</button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-0">
-                  <LessonBuilderView 
-                    data={builderData} 
-                    setData={setBuilderData} 
-                    onSave={(l) => { onSaveLesson(l); alert("Lesson Saved to Library"); }} 
-                  />
+                  ))}
                 </div>
               </div>
 
-              {/* Preview Side */}
-              <div className="w-full md:w-[400px] bg-white rounded-[3rem] border-[8px] border-slate-900/10 shadow-xl overflow-hidden flex flex-col relative">
-                {/* Simulated Notch */}
-                <div className="absolute top-0 left-0 right-0 h-8 bg-white/0 z-50 pointer-events-none" />
-                {/* Reusing LessonView for Live Preview */}
-                <div className="flex-1 overflow-hidden bg-slate-50">
-                   <LessonView lesson={previewLesson} onFinish={() => alert("Preview Finished!")} />
-                </div>
-                <div className="bg-slate-100 p-2 text-center text-xs text-slate-400 font-bold uppercase tracking-wider border-t border-slate-200">
-                  Student Preview
+              {/* Decks Section */}
+              <div>
+                <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><Layers size={18} className="text-orange-500"/> Flashcard Decks</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {Object.entries(allDecks).map(([key, deck]) => (
+                    <div key={key} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                       <h4 className="font-bold text-slate-900">{deck.title}</h4>
+                       <p className="text-xs text-slate-500">{deck.cards?.length} Cards</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           )}
-
+          {subTab === 'builder' && (
+            <div className="animate-in fade-in duration-300">
+               <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800"><p className="font-bold flex items-center gap-2"><Brain size={16}/> Instructor Mode</p></div>
+               <LessonBuilderView onSave={(l) => { onSaveLesson(l); alert("Lesson Saved"); }} />
+            </div>
+          )}
         </div>
-      </div>
+      </>
+      )}
     </div>
   );
 };
@@ -595,6 +499,7 @@ const ProfileView = ({ user, userData }) => {
           <h3 className="font-bold text-slate-900 text-sm ml-1">Account</h3>
           <button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border border-slate-200 text-rose-600 font-bold flex items-center justify-between active:bg-rose-50 transition-colors"><span>Sign Out</span><LogOut size={20} /></button>
           
+          {/* Admin zone kept for deployment purposes, but role switching removed */}
           <h3 className="font-bold text-slate-900 text-sm ml-1 mt-4">Admin Zone</h3>
           <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex items-center justify-between active:scale-95 transition-all shadow-lg"><div className="flex items-center gap-2">{deploying ? <Loader className="animate-spin" size={20} /> : <UploadCloud size={20} />}<span>Deploy System Content</span></div><Database size={20} className="opacity-50" /></button>
         </div>
@@ -969,7 +874,7 @@ const App = () => {
     if (!user) return <AuthView />;
 
     if (userData?.role === 'instructor') {
-      return <InstructorDashboard user={user} userData={userData} allDecks={allDecks} onSaveLesson={handleCreateLesson} onSaveCard={handleCreateCard} onLogout={() => signOut(auth)} />;
+      return <InstructorDashboard user={user} userData={userData} allDecks={allDecks} lessons={lessons} onSaveLesson={handleCreateLesson} onSaveCard={handleCreateCard} onLogout={() => signOut(auth)} />;
     }
 
     switch (activeTab) {
