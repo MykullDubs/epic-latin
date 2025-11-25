@@ -64,7 +64,8 @@ import {
   HelpCircle,
   Pencil,
   Image,
-  Info
+  Info,
+  Edit3
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -204,7 +205,7 @@ const Header = ({ title, subtitle, rightAction, onClickTitle }) => (
 
 // --- BUILDER COMPONENTS ---
 
-const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
+const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId }) => {
   const [formData, setFormData] = useState({
     front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', deckId: initialDeckId || 'custom'
   });
@@ -213,6 +214,7 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
   const [morphology, setMorphology] = useState([]);
   const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
   const [toastMsg, setToastMsg] = useState(null);
+  const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
     if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId}));
@@ -243,6 +245,28 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
     setMorphology(morphology.filter((_, i) => i !== index));
   };
 
+  const handleSelectCard = (card) => {
+    setEditingId(card.id);
+    setFormData({
+      front: card.front,
+      back: card.back,
+      type: card.type || 'noun',
+      ipa: card.ipa || '',
+      sentence: card.usage?.sentence || '',
+      sentenceTrans: card.usage?.translation || '',
+      grammarTags: card.grammar_tags?.join(', ') || '',
+      deckId: formData.deckId // Keep current deck selection
+    });
+    setMorphology(card.morphology || []);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleClear = () => {
+    setEditingId(null);
+    setFormData(prev => ({ ...prev, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }));
+    setMorphology([]);
+  };
+
   const handleSubmit = (e) => { 
     e.preventDefault(); 
     if (!formData.front || !formData.back) return; 
@@ -256,7 +280,7 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
         finalDeckTitle = newDeckTitle;
     }
 
-    onSaveCard({ 
+    const cardData = { 
       front: formData.front,
       back: formData.back,
       type: formData.type,
@@ -267,27 +291,39 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
       morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }],
       usage: { sentence: formData.sentence || "-", translation: formData.sentenceTrans || "-" },
       grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"]
-    }); 
+    };
+
+    if (editingId) {
+      onUpdateCard(editingId, cardData);
+      setToastMsg("Card Updated Successfully");
+    } else {
+      onSaveCard(cardData);
+      setToastMsg("Card Created Successfully");
+    }
     
-    setFormData({ ...formData, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }); 
-    setMorphology([]);
+    handleClear();
     if (isCreatingDeck) {
         setIsCreatingDeck(false);
         setNewDeckTitle('');
         setFormData(prev => ({ ...prev, deckId: finalDeckId })); 
     }
-    setToastMsg("Card Saved Successfully");
   };
 
   const deckOptions = availableDecks ? Object.entries(availableDecks).map(([key, deck]) => ({ id: key, title: deck.title })) : [];
+  
+  // Get cards for the current selected deck to list them
+  const currentDeckCards = availableDecks && availableDecks[formData.deckId] ? availableDecks[formData.deckId].cards : [];
 
   return (
     <div className="px-6 mt-4 space-y-6 pb-20 relative">
       {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
       
-      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800">
-        <p className="font-bold flex items-center gap-2"><Layers size={16}/> Advanced Card Creator</p>
-        <p className="opacity-80 text-xs mt-1">Define deep linguistic data (X-Ray) for your flashcards.</p>
+      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800 flex justify-between items-center">
+        <div>
+          <p className="font-bold flex items-center gap-2"><Layers size={16}/> {editingId ? 'Editing Card' : 'Card Creator'}</p>
+          <p className="opacity-80 text-xs mt-1">{editingId ? 'Update details below.' : 'Define deep linguistic data (X-Ray).'}</p>
+        </div>
+        {editingId && <button onClick={handleClear} className="text-xs font-bold bg-white px-3 py-1 rounded-lg shadow-sm hover:text-indigo-600">Cancel Edit</button>}
       </div>
 
       <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
@@ -296,7 +332,7 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
         {/* DECK SELECTOR */}
         <div className="space-y-2">
             <label className="text-xs font-bold text-slate-400">Target Deck</label>
-            <select name="deckId" value={formData.deckId} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900">
+            <select name="deckId" value={formData.deckId} onChange={handleChange} disabled={!!editingId} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900 disabled:opacity-50">
               <option value="custom">✍️ Scriptorium (My Deck)</option>
               {deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}
               <option value="new">✨ + Create New Deck</option>
@@ -346,7 +382,31 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
         <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Grammar Tags</label><input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="2nd Declension, Neuter" /></div>
       </section>
 
-      <button onClick={handleSubmit} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Save Card</button>
+      <button onClick={handleSubmit} className={`w-full text-white p-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${editingId ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+          {editingId ? <><Save size={20}/> Update Card</> : <><Plus size={20}/> Create Card</>}
+      </button>
+
+      {/* EXISTING CARDS LIST */}
+      {currentDeckCards && currentDeckCards.length > 0 && (
+        <div className="pt-6 border-t border-slate-200">
+            <h3 className="font-bold text-slate-800 mb-4">Cards in this Deck ({currentDeckCards.length})</h3>
+            <div className="space-y-2">
+                {currentDeckCards.map((card, idx) => (
+                    <div key={idx} onClick={() => handleSelectCard(card)} className={`p-3 rounded-xl border flex justify-between items-center cursor-pointer transition-colors ${editingId === card.id ? 'bg-indigo-50 border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-300'}`}>
+                        <div>
+                            <span className="font-bold text-slate-800">{card.front}</span>
+                            <span className="text-slate-400 mx-2">•</span>
+                            <span className="text-sm text-slate-500">{card.back}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                           <Edit3 size={16} className="text-indigo-400" />
+                           <button onClick={(e) => { e.stopPropagation(); onDeleteCard(card.id); }} className="p-1 text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -519,7 +579,7 @@ const ClassManagerView = ({ user, lessons }) => {
   );
 };
 
-const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, onSaveCard, onLogout }) => {
+const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, onSaveCard, onUpdateCard, onDeleteCard, onLogout }) => {
   const [view, setView] = useState('dashboard');
   const [builderData, setBuilderData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [builderMode, setBuilderMode] = useState('lesson');
@@ -549,8 +609,6 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
   
   const handleEditDeck = (deckId) => {
       setBuilderMode('deck');
-      // We switch view, passing deckId would require Prop drilling or context. 
-      // For now, user manually selects deck in builder.
       setView('builder'); 
   };
 
@@ -561,7 +619,6 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
     </button>
   );
 
-  // FIX: Handle preview vocab gracefully whether string or array
   const previewLesson = { 
     ...builderData, 
     vocab: typeof builderData.vocab === 'string' ? builderData.vocab.split(',').map(s => s.trim()) : (builderData.vocab || []), 
@@ -597,7 +654,7 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
           <div className="h-full flex flex-col md:flex-row gap-6 animate-in fade-in duration-500">
             <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50"><div className="flex items-center gap-3"><h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText size={18} /> Creator</h3><div className="flex bg-slate-100 p-0.5 rounded-lg"><button onClick={() => setBuilderMode('lesson')} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'lesson' ? 'bg-white shadow-sm' : ''}`}>Lesson</button><button onClick={() => setBuilderMode('deck')} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'deck' ? 'bg-white shadow-sm' : ''}`}>Deck</button></div></div><button className="text-xs font-bold text-indigo-600 hover:underline" onClick={() => { setBuilderData({ title: '', subtitle: '', description: '', vocab: '', blocks: [] }); setEditingId(null); }}>Clear Form</button></div>
-              <div className="flex-1 overflow-y-auto p-0">{builderMode === 'lesson' ? <LessonBuilderView data={builderData} setData={setBuilderData} onSave={handleSaveWithEdit} /> : <CardBuilderView onSaveCard={onSaveCard} availableDecks={allDecks} />}</div>
+              <div className="flex-1 overflow-y-auto p-0">{builderMode === 'lesson' ? <LessonBuilderView data={builderData} setData={setBuilderData} onSave={handleSaveWithEdit} /> : <CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} />}</div>
             </div>
             {builderMode === 'lesson' && <div className="w-full md:w-[400px] bg-white rounded-[3rem] border-[8px] border-slate-900/10 shadow-xl overflow-hidden flex flex-col relative"><div className="flex-1 overflow-hidden bg-slate-50"><LessonView lesson={previewLesson} onFinish={() => alert("Preview Finished")} /></div><div className="bg-slate-100 p-2 text-center text-xs text-slate-400 font-bold uppercase tracking-wider border-t border-slate-200">Student Preview</div></div>}
           </div>
@@ -608,11 +665,11 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
 };
 
 // --- BUILDER HUB (STUDENT) ---
-const BuilderHub = ({ onSaveCard, onSaveLesson, allDecks }) => {
+const BuilderHub = ({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks }) => {
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [mode, setMode] = useState('card'); 
   return (
-    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">{mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}{mode === 'card' && (<><div className="px-6 mt-2"><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button><button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button></div></div><CardBuilderView onSaveCard={onSaveCard} availableDecks={allDecks} /></>)}{mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} />}</div>
+    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">{mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}{mode === 'card' && (<><div className="px-6 mt-2"><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button><button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button></div></div><CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} /></>)}{mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} />}</div>
   );
 };
 
@@ -675,7 +732,7 @@ const ProfileView = ({ user, userData }) => {
 // --- HOME VIEW ---
 const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData }) => (
   <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full">
-    <Header title={`Ave, ${userData?.name}!`} subtitle="Perge in itinere tuo." />
+    <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." />
     <div className="px-6 space-y-6 mt-4">
       <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl"><div className="flex justify-between"><div><p className="text-rose-100 text-sm font-bold uppercase">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp} XP</h3></div><Zap size={28} className="text-yellow-400 fill-current"/></div><div className="mt-6 bg-black/20 rounded-full h-3"><div className="bg-yellow-400 h-full w-3/4 rounded-full"/></div></div>
       <div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3><div className="space-y-3">{lessons.map(l => (<button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-14 w-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700"><PlayCircle size={28}/></div><div className="text-left"><h4 className="font-bold text-slate-900">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div></div><ChevronRight className="text-slate-300"/></button>))}</div></div>
@@ -737,47 +794,6 @@ const LessonView = ({ lesson, onFinish }) => {
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
             <h3 className="text-lg font-bold text-indigo-900 mb-2">{block.title}</h3>
             <p className="text-slate-600 leading-relaxed">{block.content}</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (block.type === 'note') {
-      return (
-        <div className="space-y-4 animate-in fade-in duration-500">
-          <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <Info size={20} className="text-amber-600" />
-              <h3 className="text-lg font-bold text-amber-900">{block.title || 'Note'}</h3>
-            </div>
-            <p className="text-amber-800 leading-relaxed">{block.content}</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (block.type === 'image') {
-      return (
-        <div className="space-y-4 animate-in fade-in duration-500">
-          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
-            <img src={block.url} alt={block.caption} className="w-full h-64 object-cover rounded-xl mb-3 bg-slate-100" />
-            {block.caption && <p className="text-center text-sm text-slate-500 italic">{block.caption}</p>}
-          </div>
-        </div>
-      );
-    }
-
-    if (block.type === 'vocab-list') {
-      return (
-        <div className="space-y-4 animate-in fade-in duration-500">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2"><List size={18} className="text-indigo-600"/> Vocabulary</h3>
-          <div className="grid grid-cols-1 gap-2">
-            {block.items.map((item, i) => (
-              <div key={i} className="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center">
-                <span className="font-bold text-slate-900">{item.term}</span>
-                <span className="text-slate-500">{item.definition}</span>
-              </div>
-            ))}
           </div>
         </div>
       );
@@ -988,30 +1004,7 @@ const App = () => {
   const [activeLesson, setActiveLesson] = useState(null);
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
 
-  // Derived Data: MERGE custom cards into system decks if they belong there, or keep them in 'custom'
-  const allDecks = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
-  
-  // Ensure custom deck exists in derived state
-  if (!allDecks.custom) allDecks.custom = { title: "✍️ Scriptorium", cards: [] };
-
-  // Distribute Custom Cards
-  customCards.forEach(card => {
-      const target = card.deckId || 'custom';
-      if (allDecks[target]) {
-          if (!allDecks[target].cards) allDecks[target].cards = [];
-          allDecks[target].cards.push(card);
-      } else {
-          // If target deck doesn't exist in system decks (e.g. new custom deck), create it on fly for view
-          if (!allDecks[target] && target.startsWith('custom_')) {
-             // We need title from somewhere, usually stored in card or separate deck collection. 
-             // For simplicity, we use the ID or look for a title property if we saved one.
-             allDecks[target] = { title: card.deckTitle || "Custom Deck", cards: [] };
-          }
-          if (allDecks[target]) allDecks[target].cards.push(card);
-          else allDecks.custom.cards.push(card);
-      }
-  });
-
+  const allDecks = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: customCards } };
   const lessons = [...systemLessons, ...customLessons];
 
   useEffect(() => { const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); }); return () => unsubscribe(); }, []);
@@ -1028,7 +1021,30 @@ const App = () => {
     return () => { unsubProfile(); unsubCards(); unsubLessons(); };
   }, [user]);
 
+  // CRUD HANDLERS
   const handleCreateCard = async (c) => { if(!user) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), c); setSelectedDeckKey(c.deckId || 'custom'); setActiveTab('flashcards'); };
+  
+  const handleUpdateCard = async (cardId, data) => {
+    if (!user) return;
+    // Check if this is a custom card (system cards don't have firestore IDs in custom_cards collection usually)
+    try {
+       await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), data);
+    } catch (e) {
+       console.error(e);
+       alert("Cannot edit system cards directly. Clone to custom deck to edit.");
+    }
+  };
+
+  const handleDeleteCard = async (cardId) => {
+    if (!user) return;
+    try {
+       await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId));
+    } catch (e) {
+       console.error(e);
+       alert("Cannot delete system cards.");
+    }
+  };
+
   const handleCreateLesson = async (l, id = null) => { 
       if(!user) return; 
       if (id) {
@@ -1038,20 +1054,22 @@ const App = () => {
       }
       setActiveTab('home'); 
   };
+  
   const handleFinishLesson = async (xp) => { setActiveTab('home'); if (xp > 0 && user) { try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp) }); } catch (e) { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { ...DEFAULT_USER_DATA, xp }, { merge: true }); } } };
 
   if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
   if (!user) return <AuthView />;
-  if (!userData) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>; // Prevent race condition
+  if (!userData) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>; 
   
-  if (userData.role === 'instructor') return <InstructorDashboard user={user} userData={userData} allDecks={allDecks} lessons={lessons} onSaveLesson={handleCreateLesson} onSaveCard={handleCreateCard} onLogout={() => signOut(auth)} />;
+  // Using the unified logic, passing handlers down
+  if (userData.role === 'instructor') return <InstructorDashboard user={user} userData={userData} allDecks={allDecks} lessons={lessons} onSaveLesson={handleCreateLesson} onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onLogout={() => signOut(auth)} />;
 
   const renderStudentView = () => {
     switch (activeTab) {
       case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} onSelectLesson={(l) => { setActiveLesson(l); setActiveTab('lesson'); }} userData={userData} />;
       case 'lesson': return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} />;
       case 'flashcards': return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} />;
-      case 'create': return <BuilderHub onSaveCard={handleCreateCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} />;
+      case 'create': return <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} />;
       case 'profile': return <ProfileView user={user} userData={userData} />;
       default: return <HomeView />;
     }
