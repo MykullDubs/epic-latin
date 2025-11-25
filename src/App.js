@@ -68,7 +68,8 @@ import {
   Edit3,
   TrendingUp,
   Activity,
-  Calendar
+  Calendar,
+  FileJson
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -581,9 +582,38 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
   const [builderData, setBuilderData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [builderMode, setBuilderMode] = useState('lesson');
   const [editingId, setEditingId] = useState(null); // Track editing
+  const [jsonInput, setJsonInput] = useState(''); // For bulk import
+
+  // Bulk Import handler
+  const handleBulkImport = async () => {
+      try {
+          const data = JSON.parse(jsonInput);
+          if (!Array.isArray(data)) throw new Error("Input must be an array of lessons/decks.");
+          
+          const batch = writeBatch(db);
+          let count = 0;
+          data.forEach(item => {
+              const id = item.id || `import_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+              // Determine collection based on content. If it has 'cards', it's a deck. Otherwise a lesson.
+              const collectionName = item.cards ? 'custom_decks' : 'custom_lessons';
+              // Note: For simplicity in this prototype, we might map custom_decks to custom_cards logic or separate.
+              // Here we'll assume lessons for now as per prompt request "base lesson library".
+              // Adjusting to save to 'custom_lessons' for instructor.
+              if (!item.cards) {
+                  const ref = doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id);
+                  batch.set(ref, item);
+                  count++;
+              }
+          });
+          await batch.commit();
+          alert(`Successfully imported ${count} items.`);
+          setJsonInput('');
+      } catch (e) {
+          alert("Import Failed: " + e.message);
+      }
+  };
 
   const handleEditLesson = (lesson) => {
-      // FIX: Ensure vocab is a string for the edit form
       const safeLesson = {
           ...lesson,
           vocab: Array.isArray(lesson.vocab) ? lesson.vocab.join(', ') : (lesson.vocab || '')
@@ -606,6 +636,7 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
   
   const handleEditDeck = (deckId) => {
       setBuilderMode('deck');
+      // Pass initialDeckId to CardBuilder logic if we extracted it better, for now simpler toggle
       setView('builder'); 
   };
 
@@ -644,7 +675,14 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
       <div className="w-64 bg-white border-r border-slate-200 flex flex-col p-6 hidden md:flex">
         <div className="flex items-center gap-3 mb-10 px-2"><div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg"><GraduationCap size={24} /></div><div><h1 className="font-bold text-lg leading-none">LinguistFlow</h1><span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Magister Mode</span></div></div>
         <div className="space-y-2 flex-1"><NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" /><NavItem id="classes" icon={School} label="My Classes" /><NavItem id="library" icon={Library} label="Content Library" /><NavItem id="builder" icon={PlusCircle} label="Content Creator" /></div>
+        
+        {/* Admin Import Zone in Sidebar for easy access */}
         <div className="pt-6 border-t border-slate-100">
+           <div className="mb-4">
+             <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Bulk Import (AI)</h4>
+             <textarea value={jsonInput} onChange={e => setJsonInput(e.target.value)} className="w-full p-2 text-xs border rounded bg-slate-50 mb-2" placeholder="Paste JSON array..." rows={2}></textarea>
+             <button onClick={handleBulkImport} disabled={!jsonInput} className="w-full bg-slate-800 text-white text-xs py-1 rounded disabled:opacity-50 flex items-center justify-center gap-1"><FileJson size={12}/> Import</button>
+           </div>
           <div className="flex items-center gap-3 px-2 mb-4">
             <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs">{userData?.name?.charAt(0)}</div>
             <div className="flex-1 overflow-hidden"><p className="text-sm font-bold truncate">{userData?.name}</p><p className="text-xs text-slate-400 truncate">{user.email}</p></div>
@@ -670,7 +708,7 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
                 </div>
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                   <div className="flex justify-between items-start">
-                    <div><p className="text-slate-400 text-xs font-bold uppercase">Total Classes</p><h3 className="text-3xl font-bold text-slate-900 mt-1">{lessons.length}</h3></div> {/* Using lessons length as placeholder or pass classes prop correctly */}
+                    <div><p className="text-slate-400 text-xs font-bold uppercase">Total Classes</p><h3 className="text-3xl font-bold text-slate-900 mt-1">{lessons.length}</h3></div> 
                     <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><School size={24}/></div>
                   </div>
                 </div>
@@ -707,7 +745,6 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
                        </h3>
                        <div className="space-y-4">
                            {/* Mock classes since we don't have classes prop here directly, need to fetch inside or pass down */}
-                           {/* For now, just a placeholder visual */}
                            <div className="p-4 text-center text-slate-400 text-sm italic">No active class data available for chart.</div>
                        </div>
                     </div>
@@ -808,7 +845,6 @@ const ProfileView = ({ user, userData }) => {
   const [deploying, setDeploying] = useState(false);
   const [roleLoading, setRoleLoading] = useState(false);
   const handleLogout = () => signOut(auth);
-
   const deploySystemContent = async () => {
     setDeploying(true); const batch = writeBatch(db);
     Object.entries(INITIAL_SYSTEM_DECKS).forEach(([key, deck]) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_decks', key), deck));
@@ -816,48 +852,13 @@ const ProfileView = ({ user, userData }) => {
     try { await batch.commit(); alert("Deployed!"); } catch (e) { alert("Error: " + e.message); }
     setDeploying(false);
   };
-
-  const changeRole = async (newRole) => {
-    setRoleLoading(true);
+  const toggleRole = async () => {
+    if (!userData) return; 
+    const newRole = userData.role === 'instructor' ? 'student' : 'instructor';
     await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }, { merge: true });
-    setRoleLoading(false);
   };
-
   return (
-    <div className="h-full flex flex-col bg-slate-50">
-      <Header title="Ego" subtitle="Profile & Settings" />
-      <div className="flex-1 px-6 mt-4 overflow-y-auto">
-        <div className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col items-center mb-6">
-          <div className="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 mb-4 text-3xl font-bold">{userData?.name?.charAt(0)}</div>
-          <h2 className="text-2xl font-bold text-slate-900">{userData?.name}</h2>
-          <p className="text-sm text-slate-500">{user.email}</p>
-          <div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase">{userData?.role}</div>
-        </div>
-        
-        <div className="space-y-3">
-          <div className="bg-white p-4 rounded-xl border border-slate-200">
-            <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Current Role</label>
-            {roleLoading ? (
-              <div className="flex justify-center p-2"><Loader className="animate-spin text-indigo-600" /></div>
-            ) : (
-              <select 
-                value={userData?.role} 
-                onChange={(e) => changeRole(e.target.value)}
-                className="w-full p-2 bg-slate-50 rounded-lg font-bold text-slate-700 border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-              >
-                <option value="student">Student</option>
-                <option value="instructor">Instructor</option>
-              </select>
-            )}
-          </div>
-
-          <button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border text-rose-600 font-bold mb-4 flex justify-between items-center"><span>Sign Out</span><LogOut size={20}/></button>
-          
-          <h3 className="font-bold text-slate-900 text-sm ml-1 mt-4">Admin Zone</h3>
-          <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex justify-between items-center"><div className="flex items-center gap-2">{deploying ? <Loader className="animate-spin"/> : <UploadCloud/>}<span>Deploy System Content</span></div></button>
-        </div>
-      </div>
-    </div>
+    <div className="h-full flex flex-col bg-slate-50"><Header title="Ego" subtitle="Profile" /><div className="flex-1 px-6 mt-4"><div className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col items-center mb-6"><h2 className="text-2xl font-bold">{userData?.name}</h2><p className="text-sm text-slate-500">{user.email}</p><div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase">{userData?.role}</div></div><div className="space-y-3"><button onClick={toggleRole} className="w-full bg-white p-4 rounded-xl border text-slate-700 font-bold mb-4 flex justify-between"><span>Switch Role</span><School size={20} /></button><button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border text-rose-600 font-bold mb-4 flex justify-between"><span>Sign Out</span><LogOut/></button><button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex justify-between">{deploying ? <Loader className="animate-spin"/> : <UploadCloud/>}<span>Deploy Content</span></button></div></div></div>
   );
 };
 
@@ -926,6 +927,47 @@ const LessonView = ({ lesson, onFinish }) => {
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
             <h3 className="text-lg font-bold text-indigo-900 mb-2">{block.title}</h3>
             <p className="text-slate-600 leading-relaxed">{block.content}</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (block.type === 'note') {
+      return (
+        <div className="space-y-4 animate-in fade-in duration-500">
+          <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <Info size={20} className="text-amber-600" />
+              <h3 className="text-lg font-bold text-amber-900">{block.title || 'Note'}</h3>
+            </div>
+            <p className="text-amber-800 leading-relaxed">{block.content}</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (block.type === 'image') {
+      return (
+        <div className="space-y-4 animate-in fade-in duration-500">
+          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
+            <img src={block.url} alt={block.caption} className="w-full h-64 object-cover rounded-xl mb-3 bg-slate-100" />
+            {block.caption && <p className="text-center text-sm text-slate-500 italic">{block.caption}</p>}
+          </div>
+        </div>
+      );
+    }
+
+    if (block.type === 'vocab-list') {
+      return (
+        <div className="space-y-4 animate-in fade-in duration-500">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2"><List size={18} className="text-indigo-600"/> Vocabulary</h3>
+          <div className="grid grid-cols-1 gap-2">
+            {block.items.map((item, i) => (
+              <div key={i} className="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center">
+                <span className="font-bold text-slate-900">{item.term}</span>
+                <span className="text-slate-500">{item.definition}</span>
+              </div>
+            ))}
           </div>
         </div>
       );
@@ -1027,7 +1069,7 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) 
     });
     setQuickAddData({ front: '', back: '', type: 'noun' });
     setSearchTerm(''); 
-    alert("Card Added!");
+    // Removed basic alert, parent handles feedback or we can add toast here if needed
   };
 
   if (!card && !manageMode) return <div className="h-full flex flex-col bg-slate-50"><Header title={currentDeck?.title || "Empty Deck"} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<button onClick={() => setManageMode(true)} className="p-2 bg-slate-100 rounded-full"><List size={20} className="text-slate-600" /></button>} /><div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400"><Layers size={48} className="mb-4 opacity-20" /><p>This deck is empty.</p><button onClick={() => setManageMode(true)} className="mt-4 text-indigo-600 font-bold text-sm">Add Cards</button></div></div>;
