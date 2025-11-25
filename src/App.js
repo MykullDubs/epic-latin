@@ -98,7 +98,8 @@ const INITIAL_SYSTEM_DECKS = {
     title: "👋 Salutationes",
     cards: [
       { id: 's1', front: "Salve", back: "Hello (Singular)", ipa: "/ˈsal.weː/", type: "phrase", mastery: 4, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-e", meaning: "Imp. Sing.", type: "suffix" }], usage: { sentence: "Salve, Marce!", translation: "Hello, Marcus!" }, grammar_tags: ["Imperative", "Greeting"] },
-      { id: 's2', front: "Salvete", back: "Hello (Plural)", ipa: "/salˈweː.te/", type: "phrase", mastery: 3, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-ete", meaning: "Imp. Pl.", type: "suffix" }], usage: { sentence: "Salvete, discipuli!", translation: "Hello, students!" }, grammar_tags: ["Imperative", "Greeting"] }
+      { id: 's2', front: "Salvete", back: "Hello (Plural)", ipa: "/salˈweː.te/", type: "phrase", mastery: 3, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-ete", meaning: "Imp. Pl.", type: "suffix" }], usage: { sentence: "Salvete, discipuli!", translation: "Hello, students!" }, grammar_tags: ["Imperative", "Greeting"] },
+      { id: 's3', front: "Vale", back: "Goodbye", ipa: "/ˈwa.leː/", type: "phrase", mastery: 3, morphology: [{ part: "Val-", meaning: "Be strong", type: "root" }, { part: "-e", meaning: "Imp.", type: "suffix" }], usage: { sentence: "Vale, amice.", translation: "Goodbye, friend." }, grammar_tags: ["Valediction"] }
     ]
   },
   medicina: {
@@ -117,26 +118,15 @@ const INITIAL_SYSTEM_LESSONS = [
     description: "Learn how to greet friends and elders.",
     xp: 50,
     vocab: ['Salve', 'Vale', 'Quid agis?'],
-    blocks: [
-      {
-        type: 'text',
-        title: 'The Basics',
-        content: 'In Latin, we distinguish between addressing one person ("Salve") and multiple people ("Salvete").'
-      },
-      {
-        type: 'dialogue',
-        lines: [
-          { speaker: "Marcus", text: "Salve, Iulia!", translation: "Hello, Julia!", side: "left" },
-          { speaker: "Iulia", text: "Salve, Marce.", translation: "Hello, Marcus.", side: "right" }
-        ]
-      },
-      {
-        type: 'quiz',
-        question: "How do you say 'Hello' to a group?",
-        options: [{ id: 'a', text: "Salve" }, { id: 'b', text: "Salvete" }, { id: 'c', text: "Vale" }],
-        correctId: 'b'
-      }
-    ]
+    dialogue: [
+      { speaker: "Marcus", text: "Salve, Iulia!", translation: "Hello, Julia!", side: "left" },
+      { speaker: "Iulia", text: "Salve, Marce.", translation: "Hello, Marcus.", side: "right" }
+    ],
+    quiz: {
+      question: "How do you say 'Hello' to a group?",
+      options: [{ id: 'a', text: "Salve" }, { id: 'b', text: "Salvete" }, { id: 'c', text: "Vale" }],
+      correctId: 'b'
+    }
   }
 ];
 
@@ -149,6 +139,20 @@ const TYPE_COLORS = {
 };
 
 // --- SHARED COMPONENTS ---
+
+const Toast = ({ message, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900/90 backdrop-blur-sm text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300 border border-white/10">
+      <Check size={16} className="text-emerald-400" />
+      <span className="text-sm font-medium tracking-wide">{message}</span>
+    </div>
+  );
+};
 
 const Navigation = ({ activeTab, setActiveTab }) => {
   const tabs = [
@@ -185,11 +189,25 @@ const CardBuilderView = ({ onSaveCard, availableDecks }) => {
   const [formData, setFormData] = useState({
     front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', deckId: 'custom'
   });
-  
+  const [isCreatingDeck, setIsCreatingDeck] = useState(false);
+  const [newDeckTitle, setNewDeckTitle] = useState('');
   const [morphology, setMorphology] = useState([]);
   const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
+  const [toastMsg, setToastMsg] = useState(null);
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    if (e.target.name === 'deckId') {
+      if (e.target.value === 'new') {
+        setIsCreatingDeck(true);
+        setFormData({ ...formData, deckId: 'new' });
+      } else {
+        setIsCreatingDeck(false);
+        setFormData({ ...formData, deckId: e.target.value });
+      }
+    } else {
+      setFormData({ ...formData, [e.target.name]: e.target.value });
+    }
+  };
 
   const addMorphology = () => {
     if (newMorphPart.part && newMorphPart.meaning) {
@@ -206,11 +224,21 @@ const CardBuilderView = ({ onSaveCard, availableDecks }) => {
     e.preventDefault(); 
     if (!formData.front || !formData.back) return; 
     
+    let finalDeckId = formData.deckId;
+    let finalDeckTitle = null;
+
+    if (formData.deckId === 'new') {
+        if (!newDeckTitle) return alert("Please name your new deck.");
+        finalDeckId = `custom_${Date.now()}`;
+        finalDeckTitle = newDeckTitle;
+    }
+
     onSaveCard({ 
       front: formData.front,
       back: formData.back,
       type: formData.type,
-      deckId: formData.deckId,
+      deckId: finalDeckId,
+      deckTitle: finalDeckTitle, // Pass title to create deck in App logic
       ipa: formData.ipa || "/.../",
       mastery: 0,
       morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }],
@@ -220,13 +248,20 @@ const CardBuilderView = ({ onSaveCard, availableDecks }) => {
     
     setFormData({ ...formData, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }); 
     setMorphology([]);
-    alert("Card Created!");
+    if (isCreatingDeck) {
+        setIsCreatingDeck(false);
+        setNewDeckTitle('');
+        setFormData(prev => ({ ...prev, deckId: finalDeckId })); // Switch to the newly created deck
+    }
+    setToastMsg("Card Saved Successfully");
   };
 
   const deckOptions = availableDecks ? Object.entries(availableDecks).map(([key, deck]) => ({ id: key, title: deck.title })) : [];
 
   return (
-    <div className="px-6 mt-4 space-y-6 pb-20">
+    <div className="px-6 mt-4 space-y-6 pb-20 relative">
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+      
       <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800">
         <p className="font-bold flex items-center gap-2"><Layers size={16}/> Advanced Card Creator</p>
         <p className="opacity-80 text-xs mt-1">Define deep linguistic data (X-Ray) for your flashcards.</p>
@@ -241,7 +276,17 @@ const CardBuilderView = ({ onSaveCard, availableDecks }) => {
             <select name="deckId" value={formData.deckId} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900">
               <option value="custom">✍️ Scriptorium (My Deck)</option>
               {deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}
+              <option value="new">✨ + Create New Deck</option>
             </select>
+            {isCreatingDeck && (
+                <input 
+                    value={newDeckTitle} 
+                    onChange={(e) => setNewDeckTitle(e.target.value)} 
+                    placeholder="Enter New Deck Name" 
+                    className="w-full p-3 rounded-lg border-2 border-indigo-500 bg-white font-bold mt-2 animate-in fade-in slide-in-from-top-2"
+                    autoFocus
+                />
+            )}
         </div>
         <div className="grid grid-cols-2 gap-4">
            <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Latin Word</label><input name="front" value={formData.front} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="e.g. Bellum" /></div>
@@ -420,14 +465,6 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
   const [view, setView] = useState('dashboard');
   const [builderData, setBuilderData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [builderMode, setBuilderMode] = useState('lesson');
-  const [roleLoading, setRoleLoading] = useState(false);
-
-  const toggleRole = async () => {
-    setRoleLoading(true);
-    const newRole = userData.role === 'instructor' ? 'student' : 'instructor';
-    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }, { merge: true });
-    // No need to manually set loading false, component will unmount/remount on role change or re-render
-  };
 
   const NavItem = ({ id, icon: Icon, label }) => (
     <button onClick={() => setView(id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${view === id ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
@@ -452,7 +489,6 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
             <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs">{userData?.name?.charAt(0)}</div>
             <div className="flex-1 overflow-hidden"><p className="text-sm font-bold truncate">{userData?.name}</p><p className="text-xs text-slate-400 truncate">{user.email}</p></div>
           </div>
-          <button onClick={toggleRole} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg transition-colors mb-1">{roleLoading ? <Loader className="animate-spin" size={16}/> : <BookOpen size={16} />} Switch to Student</button>
           <button onClick={onLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><LogOut size={16} /> Sign Out</button>
         </div>
       </div>
@@ -528,9 +564,7 @@ const AuthView = () => {
 // --- PROFILE VIEW ---
 const ProfileView = ({ user, userData }) => {
   const [deploying, setDeploying] = useState(false);
-  const [roleLoading, setRoleLoading] = useState(false);
   const handleLogout = () => signOut(auth);
-
   const deploySystemContent = async () => {
     setDeploying(true); const batch = writeBatch(db);
     Object.entries(INITIAL_SYSTEM_DECKS).forEach(([key, deck]) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_decks', key), deck));
@@ -538,55 +572,20 @@ const ProfileView = ({ user, userData }) => {
     try { await batch.commit(); alert("Deployed!"); } catch (e) { alert("Error: " + e.message); }
     setDeploying(false);
   };
-
-  const changeRole = async (newRole) => {
-    setRoleLoading(true);
+  const toggleRole = async () => {
+    if (!userData) return; 
+    const newRole = userData.role === 'instructor' ? 'student' : 'instructor';
     await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }, { merge: true });
-    setRoleLoading(false);
   };
-
   return (
-    <div className="h-full flex flex-col bg-slate-50">
-      <Header title="Ego" subtitle="Profile & Settings" />
-      <div className="flex-1 px-6 mt-4 overflow-y-auto">
-        <div className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col items-center mb-6">
-          <div className="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 mb-4 text-3xl font-bold">{userData?.name?.charAt(0)}</div>
-          <h2 className="text-2xl font-bold text-slate-900">{userData?.name}</h2>
-          <p className="text-sm text-slate-500">{user.email}</p>
-          <div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase">{userData?.role}</div>
-        </div>
-        
-        <div className="space-y-3">
-          <div className="bg-white p-4 rounded-xl border border-slate-200">
-            <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Current Role</label>
-            {roleLoading ? (
-              <div className="flex justify-center p-2"><Loader className="animate-spin text-indigo-600" /></div>
-            ) : (
-              <select 
-                value={userData?.role} 
-                onChange={(e) => changeRole(e.target.value)}
-                className="w-full p-2 bg-slate-50 rounded-lg font-bold text-slate-700 border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-              >
-                <option value="student">Student</option>
-                <option value="instructor">Instructor</option>
-              </select>
-            )}
-          </div>
-
-          <button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border text-rose-600 font-bold mb-4 flex justify-between items-center"><span>Sign Out</span><LogOut size={20}/></button>
-          
-          <h3 className="font-bold text-slate-900 text-sm ml-1 mt-4">Admin Zone</h3>
-          <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex justify-between items-center"><div className="flex items-center gap-2">{deploying ? <Loader className="animate-spin"/> : <UploadCloud/>}<span>Deploy System Content</span></div></button>
-        </div>
-      </div>
-    </div>
+    <div className="h-full flex flex-col bg-slate-50"><Header title="Ego" subtitle="Profile" /><div className="flex-1 px-6 mt-4"><div className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col items-center mb-6"><h2 className="text-2xl font-bold">{userData?.name}</h2><p className="text-sm text-slate-500">{user.email}</p><div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase">{userData?.role}</div></div><div className="space-y-3"><button onClick={toggleRole} className="w-full bg-white p-4 rounded-xl border text-slate-700 font-bold mb-4 flex justify-between"><span>Switch Role</span><School size={20} /></button><button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border text-rose-600 font-bold mb-4 flex justify-between"><span>Sign Out</span><LogOut/></button><button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex justify-between">{deploying ? <Loader className="animate-spin"/> : <UploadCloud/>}<span>Deploy Content</span></button></div></div></div>
   );
 };
 
 // --- HOME VIEW ---
 const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData }) => (
   <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full">
-    <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." />
+    <Header title={`Ave, ${userData?.name}!`} subtitle="Perge in itinere tuo." />
     <div className="px-6 space-y-6 mt-4">
       <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl"><div className="flex justify-between"><div><p className="text-rose-100 text-sm font-bold uppercase">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp} XP</h3></div><Zap size={28} className="text-yellow-400 fill-current"/></div><div className="mt-6 bg-black/20 rounded-full h-3"><div className="bg-yellow-400 h-full w-3/4 rounded-full"/></div></div>
       <div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3><div className="space-y-3">{lessons.map(l => (<button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-14 w-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700"><PlayCircle size={28}/></div><div className="text-left"><h4 className="font-bold text-slate-900">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div></div><ChevronRight className="text-slate-300"/></button>))}</div></div>
@@ -749,7 +748,7 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) 
     });
     setQuickAddData({ front: '', back: '', type: 'noun' });
     setSearchTerm(''); 
-    alert("Card Added!");
+    // Removed basic alert, parent handles feedback or we can add toast here if needed
   };
 
   if (!card && !manageMode) return <div className="h-full flex flex-col bg-slate-50"><Header title={currentDeck?.title || "Empty Deck"} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<button onClick={() => setManageMode(true)} className="p-2 bg-slate-100 rounded-full"><List size={20} className="text-slate-600" /></button>} /><div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400"><Layers size={48} className="mb-4 opacity-20" /><p>This deck is empty.</p><button onClick={() => setManageMode(true)} className="mt-4 text-indigo-600 font-bold text-sm">Add Cards</button></div></div>;
@@ -887,9 +886,6 @@ const App = () => {
     const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => { if (docSnap.exists()) setUserData(docSnap.data()); else setUserData(DEFAULT_USER_DATA); });
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    
-    // In a real app, we might fetch system content from Firestore public path, but hardcoded is safer for immediate stability
-    // const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), ...
     
     return () => { unsubProfile(); unsubCards(); unsubLessons(); };
   }, [user]);
