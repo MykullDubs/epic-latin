@@ -224,238 +224,74 @@ const CardBuilderView = ({ onSaveCard, availableDecks }) => {
     alert("Card Created!");
   };
 
-  // Prepare deck options
   const deckOptions = availableDecks ? Object.entries(availableDecks).map(([key, deck]) => ({ id: key, title: deck.title })) : [];
 
   return (
     <div className="px-6 mt-4 space-y-6 pb-20">
       <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800">
         <p className="font-bold flex items-center gap-2"><Layers size={16}/> Advanced Card Creator</p>
-        <p className="opacity-80 text-xs mt-1">Define deep linguistic data (X-Ray) for your flashcards.</p>
       </div>
-
-      {/* Basic Info */}
       <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
         <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Core Data</h3>
-        
-        {/* DECK SELECTOR */}
         <div className="space-y-2">
             <label className="text-xs font-bold text-slate-400">Target Deck</label>
             <select name="deckId" value={formData.deckId} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900">
               <option value="custom">✍️ Scriptorium (My Deck)</option>
-              {deckOptions.filter(d => d.id !== 'custom').map(d => (
-                  <option key={d.id} value={d.id}>{d.title}</option>
-              ))}
+              {deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}
             </select>
         </div>
-
         <div className="grid grid-cols-2 gap-4">
-           <div className="space-y-2">
-             <label className="text-xs font-bold text-slate-400">Latin Word</label>
-             <input name="front" value={formData.front} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="e.g. Bellum" />
-           </div>
-           <div className="space-y-2">
-             <label className="text-xs font-bold text-slate-400">English</label>
-             <input name="back" value={formData.back} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="e.g. War" />
-           </div>
+           <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Latin Word</label><input name="front" value={formData.front} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-bold" /></div>
+           <div className="space-y-2"><label className="text-xs font-bold text-slate-400">English</label><input name="back" value={formData.back} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" /></div>
         </div>
-        
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-             <label className="text-xs font-bold text-slate-400">Part of Speech</label>
-             <select name="type" value={formData.type} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-white">
-               <option value="noun">Noun</option>
-               <option value="verb">Verb</option>
-               <option value="adjective">Adjective</option>
-               <option value="adverb">Adverb</option>
-               <option value="phrase">Phrase</option>
-             </select>
-           </div>
-           <div className="space-y-2">
-             <label className="text-xs font-bold text-slate-400">IPA</label>
-             <input name="ipa" value={formData.ipa} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-mono text-sm" placeholder="/ˈbel.lum/" />
-           </div>
+          <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Part of Speech</label><select name="type" value={formData.type} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-white"><option value="noun">Noun</option><option value="verb">Verb</option><option value="adjective">Adjective</option><option value="adverb">Adverb</option><option value="phrase">Phrase</option></select></div>
+          <div className="space-y-2"><label className="text-xs font-bold text-slate-400">IPA</label><input name="ipa" value={formData.ipa} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-mono text-sm" /></div>
         </div>
       </section>
-
-      {/* Morphology Builder */}
       <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
         <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Morphology (X-Ray Data)</h3>
         <div className="flex gap-2 items-end">
-           <div className="flex-1 space-y-1">
-             <label className="text-[10px] font-bold text-slate-400">Part</label>
-             <input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="Bell-" />
-           </div>
-           <div className="flex-1 space-y-1">
-             <label className="text-[10px] font-bold text-slate-400">Meaning</label>
-             <input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="War" />
-           </div>
-           <div className="w-24 space-y-1">
-             <label className="text-[10px] font-bold text-slate-400">Type</label>
-             <select value={newMorphPart.type} onChange={(e) => setNewMorphPart({...newMorphPart, type: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm bg-white">
-               <option value="root">Root</option>
-               <option value="prefix">Prefix</option>
-               <option value="suffix">Suffix</option>
-             </select>
-           </div>
+           <div className="flex-1 space-y-1"><label className="text-[10px] font-bold text-slate-400">Part</label><input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" /></div>
+           <div className="flex-1 space-y-1"><label className="text-[10px] font-bold text-slate-400">Meaning</label><input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" /></div>
            <button type="button" onClick={addMorphology} className="bg-indigo-100 text-indigo-600 p-2 rounded-lg hover:bg-indigo-200"><Plus size={20}/></button>
         </div>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {morphology.map((m, i) => (
-            <div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full text-sm">
-              <span className="font-bold text-indigo-700">{m.part}</span>
-              <span className="text-slate-500 text-xs">({m.meaning})</span>
-              <button type="button" onClick={() => removeMorphology(i)} className="text-slate-300 hover:text-rose-500"><X size={14}/></button>
-            </div>
-          ))}
-          {morphology.length === 0 && <p className="text-xs text-slate-400 italic">No morphology parts added.</p>}
-        </div>
+        <div className="flex flex-wrap gap-2 mt-2">{morphology.map((m, i) => (<div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full text-sm"><span className="font-bold text-indigo-700">{m.part}</span><span className="text-slate-500 text-xs">({m.meaning})</span><button type="button" onClick={() => removeMorphology(i)} className="text-slate-300 hover:text-rose-500"><X size={14}/></button></div>))}</div>
       </section>
-
-      {/* Context & Grammar */}
       <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
         <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Context & Grammar</h3>
-        <div className="space-y-2">
-           <label className="text-xs font-bold text-slate-400">Example Sentence</label>
-           <input name="sentence" value={formData.sentence} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 italic" placeholder="Si vis pacem, para bellum." />
-        </div>
-        <div className="space-y-2">
-           <label className="text-xs font-bold text-slate-400">Translation</label>
-           <input name="sentenceTrans" value={formData.sentenceTrans} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="If you want peace, prepare for war." />
-        </div>
-        <div className="space-y-2">
-           <label className="text-xs font-bold text-slate-400">Grammar Tags</label>
-           <input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="2nd Declension, Neuter" />
-        </div>
+        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Example Sentence</label><input name="sentence" value={formData.sentence} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 italic" /></div>
+        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Translation</label><input name="sentenceTrans" value={formData.sentenceTrans} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" /></div>
+        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Grammar Tags</label><input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" /></div>
       </section>
-
       <button onClick={handleSubmit} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Save Card</button>
     </div>
   );
 };
 
 const LessonBuilderView = ({ data, setData, onSave }) => {
-  // Helper to update specific blocks
-  const updateBlock = (index, field, value) => {
-    const newBlocks = [...(data.blocks || [])];
-    newBlocks[index] = { ...newBlocks[index], [field]: value };
-    setData({ ...data, blocks: newBlocks });
-  };
-
-  const updateDialogueLine = (blockIndex, lineIndex, field, value) => {
-    const newBlocks = [...(data.blocks || [])];
-    newBlocks[blockIndex].lines[lineIndex][field] = value;
-    setData({ ...data, blocks: newBlocks });
-  };
-
-  const addBlock = (type) => {
-    const baseBlock = type === 'dialogue' ? { type: 'dialogue', lines: [{ speaker: 'A', text: '', translation: '', side: 'left' }] }
-      : type === 'quiz' ? { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' }
-      : { type: 'text', title: '', content: '' }; // text
-    
-    setData({ ...data, blocks: [...(data.blocks || []), baseBlock] });
-  };
-
-  const removeBlock = (index) => {
-    const newBlocks = [...(data.blocks || [])].filter((_, i) => i !== index);
-    setData({ ...data, blocks: newBlocks });
-  };
-
+  const updateBlock = (index, field, value) => { const newBlocks = [...(data.blocks || [])]; newBlocks[index] = { ...newBlocks[index], [field]: value }; setData({ ...data, blocks: newBlocks }); };
+  const updateDialogueLine = (blockIndex, lineIndex, field, value) => { const newBlocks = [...(data.blocks || [])]; newBlocks[blockIndex].lines[lineIndex][field] = value; setData({ ...data, blocks: newBlocks }); };
+  const addBlock = (type) => { const baseBlock = type === 'dialogue' ? { type: 'dialogue', lines: [{ speaker: 'A', text: '', translation: '', side: 'left' }] } : type === 'quiz' ? { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' } : { type: 'text', title: '', content: '' }; setData({ ...data, blocks: [...(data.blocks || []), baseBlock] }); };
+  const removeBlock = (index) => { const newBlocks = [...(data.blocks || [])].filter((_, i) => i !== index); setData({ ...data, blocks: newBlocks }); };
   const handleSave = () => { if (!data.title) return alert("Title required"); onSave({ ...data, vocab: data.vocab.split(',').map(s => s.trim()), xp: 100 }); };
 
   return (
     <div className="px-6 mt-4 space-y-8 pb-20">
-      {/* Header Info */}
-      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-        <h3 className="font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> Lesson Metadata</h3>
-        <input className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="Title" value={data.title} onChange={e => setData({...data, title: e.target.value})} />
-        <textarea className="w-full p-3 rounded-lg border border-slate-200 text-sm" placeholder="Description" value={data.description} onChange={e => setData({...data, description: e.target.value})} />
-        <input className="w-full p-3 rounded-lg border border-slate-200 text-sm" placeholder="Vocab (comma separated)" value={data.vocab} onChange={e => setData({...data, vocab: e.target.value})} />
-      </section>
-
-      {/* Blocks Editor */}
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm"><h3 className="font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> Lesson Metadata</h3><input className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="Title" value={data.title} onChange={e => setData({...data, title: e.target.value})} /><textarea className="w-full p-3 rounded-lg border border-slate-200 text-sm" placeholder="Description" value={data.description} onChange={e => setData({...data, description: e.target.value})} /><input className="w-full p-3 rounded-lg border border-slate-200 text-sm" placeholder="Vocab (comma separated)" value={data.vocab} onChange={e => setData({...data, vocab: e.target.value})} /></section>
       <div className="space-y-4">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2"><Layers size={18} className="text-indigo-600"/> Content Blocks</h3>
-          <span className="text-xs text-slate-400">{(data.blocks || []).length} Blocks</span>
-        </div>
-
+        <div className="flex items-center justify-between px-1"><h3 className="font-bold text-slate-800 flex items-center gap-2"><Layers size={18} className="text-indigo-600"/> Content Blocks</h3><span className="text-xs text-slate-400">{(data.blocks || []).length} Blocks</span></div>
         {(data.blocks || []).map((block, idx) => (
           <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative group">
-            <div className="absolute right-4 top-4 flex gap-2">
-               <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-2 py-1 rounded">{block.type}</span>
-               <button onClick={() => removeBlock(idx)} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>
-            </div>
-
-            {/* TEXT BLOCK EDITOR */}
-            {block.type === 'text' && (
-              <div className="space-y-3 mt-4">
-                <input className="w-full p-2 border-b border-slate-100 font-bold text-sm focus:outline-none" placeholder="Section Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
-                <textarea className="w-full p-2 bg-slate-50 rounded-lg text-sm min-h-[80px]" placeholder="Content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
-              </div>
-            )}
-
-            {/* DIALOGUE BLOCK EDITOR */}
-            {block.type === 'dialogue' && (
-               <div className="space-y-3 mt-6">
-                 {block.lines.map((line, lIdx) => (
-                   <div key={lIdx} className="flex gap-2 text-sm">
-                     <input className="w-16 p-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold" placeholder="Speaker" value={line.speaker} onChange={e => updateDialogueLine(idx, lIdx, 'speaker', e.target.value)} />
-                     <div className="flex-1 space-y-1">
-                       <input className="w-full p-1 border-b border-slate-100" placeholder="Latin" value={line.text} onChange={e => updateDialogueLine(idx, lIdx, 'text', e.target.value)} />
-                       <input className="w-full p-1 text-xs text-slate-500 italic" placeholder="English" value={line.translation} onChange={e => updateDialogueLine(idx, lIdx, 'translation', e.target.value)} />
-                     </div>
-                   </div>
-                 ))}
-                 <button onClick={() => {
-                    const newLines = [...block.lines, { speaker: 'B', text: '', translation: '', side: 'right' }];
-                    updateBlock(idx, 'lines', newLines);
-                 }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Add Line</button>
-               </div>
-            )}
-
-            {/* QUIZ BLOCK EDITOR */}
-            {block.type === 'quiz' && (
-              <div className="space-y-3 mt-4">
-                <input className="w-full p-2 bg-slate-50 rounded-lg font-bold text-sm" placeholder="Question" value={block.question} onChange={e => updateBlock(idx, 'question', e.target.value)} />
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Options (ID, Text)</p>
-                  {block.options.map((opt, oIdx) => (
-                    <div key={oIdx} className="flex gap-2">
-                      <input className="w-8 p-1 bg-slate-50 text-center text-xs" value={opt.id} readOnly />
-                      <input className="flex-1 p-1 border-b border-slate-100 text-sm" value={opt.text} onChange={(e) => {
-                        const newOpts = [...block.options]; newOpts[oIdx].text = e.target.value;
-                        updateBlock(idx, 'options', newOpts);
-                      }} />
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 text-sm mt-2">
-                  <span className="text-slate-500">Correct ID:</span>
-                  <input className="w-10 p-1 bg-green-50 border border-green-200 rounded text-center font-bold text-green-700" value={block.correctId} onChange={e => updateBlock(idx, 'correctId', e.target.value)} />
-                </div>
-              </div>
-            )}
+            <div className="absolute right-4 top-4 flex gap-2"><span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-2 py-1 rounded">{block.type}</span><button onClick={() => removeBlock(idx)} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div>
+            {block.type === 'text' && (<div className="space-y-3 mt-4"><input className="w-full p-2 border-b border-slate-100 font-bold text-sm focus:outline-none" placeholder="Section Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} /><textarea className="w-full p-2 bg-slate-50 rounded-lg text-sm min-h-[80px]" placeholder="Content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} /></div>)}
+            {block.type === 'dialogue' && (<div className="space-y-3 mt-6">{block.lines.map((line, lIdx) => (<div key={lIdx} className="flex gap-2 text-sm"><input className="w-16 p-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold" placeholder="Speaker" value={line.speaker} onChange={e => updateDialogueLine(idx, lIdx, 'speaker', e.target.value)} /><div className="flex-1 space-y-1"><input className="w-full p-1 border-b border-slate-100" placeholder="Latin" value={line.text} onChange={e => updateDialogueLine(idx, lIdx, 'text', e.target.value)} /><input className="w-full p-1 text-xs text-slate-500 italic" placeholder="English" value={line.translation} onChange={e => updateDialogueLine(idx, lIdx, 'translation', e.target.value)} /></div></div>))}<button onClick={() => { const newLines = [...block.lines, { speaker: 'B', text: '', translation: '', side: 'right' }]; updateBlock(idx, 'lines', newLines); }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Add Line</button></div>)}
+            {block.type === 'quiz' && (<div className="space-y-3 mt-4"><input className="w-full p-2 bg-slate-50 rounded-lg font-bold text-sm" placeholder="Question" value={block.question} onChange={e => updateBlock(idx, 'question', e.target.value)} /><div className="space-y-1"><p className="text-[10px] font-bold text-slate-400 uppercase">Options (ID, Text)</p>{block.options.map((opt, oIdx) => (<div key={oIdx} className="flex gap-2"><input className="w-8 p-1 bg-slate-50 text-center text-xs" value={opt.id} readOnly /><input className="flex-1 p-1 border-b border-slate-100 text-sm" value={opt.text} onChange={(e) => { const newOpts = [...block.options]; newOpts[oIdx].text = e.target.value; updateBlock(idx, 'options', newOpts); }} /></div>))}</div><div className="flex items-center gap-2 text-sm mt-2"><span className="text-slate-500">Correct ID:</span><input className="w-10 p-1 bg-green-50 border border-green-200 rounded text-center font-bold text-green-700" value={block.correctId} onChange={e => updateBlock(idx, 'correctId', e.target.value)} /></div></div>)}
           </div>
         ))}
       </div>
-
-      {/* Add Block Buttons */}
-      <div className="grid grid-cols-3 gap-2">
-        <button onClick={() => addBlock('text')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50 hover:border-indigo-200 hover:text-indigo-600 transition-all">
-          <AlignLeft size={20}/> <span className="text-[10px] font-bold">Text</span>
-        </button>
-        <button onClick={() => addBlock('dialogue')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50 hover:border-indigo-200 hover:text-indigo-600 transition-all">
-          <MessageSquare size={20}/> <span className="text-[10px] font-bold">Dialogue</span>
-        </button>
-        <button onClick={() => addBlock('quiz')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50 hover:border-indigo-200 hover:text-indigo-600 transition-all">
-          <HelpCircle size={20}/> <span className="text-[10px] font-bold">Quiz</span>
-        </button>
-      </div>
-
-      <div className="pt-4 border-t border-slate-100">
-         <button onClick={handleSave} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform"><Save size={20} /> Save Lesson to Library</button>
-      </div>
+      <div className="grid grid-cols-3 gap-2"><button onClick={() => addBlock('text')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><AlignLeft size={20}/> <span className="text-[10px] font-bold">Text</span></button><button onClick={() => addBlock('dialogue')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><MessageSquare size={20}/> <span className="text-[10px] font-bold">Dialogue</span></button><button onClick={() => addBlock('quiz')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><HelpCircle size={20}/> <span className="text-[10px] font-bold">Quiz</span></button></div>
+      <div className="pt-4 border-t border-slate-100"><button onClick={handleSave} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform"><Save size={20} /> Save Lesson to Library</button></div>
     </div>
   );
 };
@@ -571,6 +407,11 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
   const [builderData, setBuilderData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [builderMode, setBuilderMode] = useState('lesson');
 
+  const toggleRole = async () => {
+    const newRole = userData.role === 'instructor' ? 'student' : 'instructor';
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }, { merge: true });
+  };
+
   const NavItem = ({ id, icon: Icon, label }) => (
     <button onClick={() => setView(id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${view === id ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
       <Icon size={20} /><span>{label}</span>
@@ -589,7 +430,14 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
       <div className="w-64 bg-white border-r border-slate-200 flex flex-col p-6 hidden md:flex">
         <div className="flex items-center gap-3 mb-10 px-2"><div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg"><GraduationCap size={24} /></div><div><h1 className="font-bold text-lg leading-none">LinguistFlow</h1><span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Magister Mode</span></div></div>
         <div className="space-y-2 flex-1"><NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" /><NavItem id="classes" icon={School} label="My Classes" /><NavItem id="library" icon={Library} label="Content Library" /><NavItem id="builder" icon={PlusCircle} label="Content Creator" /></div>
-        <div className="pt-6 border-t border-slate-100"><button onClick={onLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><LogOut size={16} /> Sign Out</button></div>
+        <div className="pt-6 border-t border-slate-100">
+          <div className="flex items-center gap-3 px-2 mb-4">
+            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs">{userData?.name?.charAt(0)}</div>
+            <div className="flex-1 overflow-hidden"><p className="text-sm font-bold truncate">{userData?.name}</p><p className="text-xs text-slate-400 truncate">{user.email}</p></div>
+          </div>
+          <button onClick={toggleRole} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg transition-colors mb-1"><BookOpen size={16} /> Student View</button>
+          <button onClick={onLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><LogOut size={16} /> Sign Out</button>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-6 max-w-6xl mx-auto h-full">
         {view === 'dashboard' && (
@@ -674,7 +522,7 @@ const ProfileView = ({ user, userData }) => {
   const toggleRole = async () => {
     if (!userData) return; 
     const newRole = userData.role === 'instructor' ? 'student' : 'instructor';
-    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole });
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }, { merge: true });
   };
   return (
     <div className="h-full flex flex-col bg-slate-50"><Header title="Ego" subtitle="Profile" /><div className="flex-1 px-6 mt-4"><div className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col items-center mb-6"><h2 className="text-2xl font-bold">{userData?.name}</h2><p className="text-sm text-slate-500">{user.email}</p><div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase">{userData?.role}</div></div><div className="space-y-3"><button onClick={toggleRole} className="w-full bg-white p-4 rounded-xl border text-slate-700 font-bold mb-4 flex justify-between"><span>Switch Role</span><School size={20} /></button><button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border text-rose-600 font-bold mb-4 flex justify-between"><span>Sign Out</span><LogOut/></button><button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex justify-between">{deploying ? <Loader className="animate-spin"/> : <UploadCloud/>}<span>Deploy Content</span></button></div></div></div>
