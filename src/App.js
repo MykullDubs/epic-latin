@@ -57,7 +57,8 @@ import {
   ArrowRight,
   LayoutDashboard,
   Settings,
-  MoreVertical
+  MoreVertical,
+  Library // Added missing import
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION (EPIC LATIN) ---
