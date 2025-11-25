@@ -583,28 +583,50 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
   const [builderMode, setBuilderMode] = useState('lesson');
   const [editingId, setEditingId] = useState(null); // Track editing
   const [jsonInput, setJsonInput] = useState(''); // For bulk import
+  const [importMode, setImportMode] = useState('lesson'); // 'lesson' or 'deck'
 
   // Bulk Import handler
   const handleBulkImport = async () => {
       try {
           const data = JSON.parse(jsonInput);
-          if (!Array.isArray(data)) throw new Error("Input must be an array of lessons/decks.");
+          if (!Array.isArray(data)) throw new Error("Input must be an array.");
           
           const batch = writeBatch(db);
           let count = 0;
+          
           data.forEach(item => {
               const id = item.id || `import_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-              // Determine collection based on content. If it has 'cards', it's a deck. Otherwise a lesson.
-              const collectionName = item.cards ? 'custom_decks' : 'custom_lessons';
-              // Note: For simplicity in this prototype, we might map custom_decks to custom_cards logic or separate.
-              // Here we'll assume lessons for now as per prompt request "base lesson library".
-              // Adjusting to save to 'custom_lessons' for instructor.
-              if (!item.cards) {
-                  const ref = doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id);
-                  batch.set(ref, item);
-                  count++;
+              
+              // Case 1: It's a Deck (has 'cards' array)
+              if (item.cards && Array.isArray(item.cards)) {
+                  const deckId = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+                  const deckTitle = item.title || "Imported Deck";
+                  
+                  item.cards.forEach(card => {
+                      const cardRef = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'));
+                      batch.set(cardRef, {
+                          ...card,
+                          deckId: deckId,
+                          deckTitle: deckTitle,
+                          type: card.type || 'noun', // default
+                          mastery: 0,
+                          grammar_tags: card.grammar_tags || ["Imported"]
+                      });
+                      count++;
+                  });
+              } 
+              // Case 2: It's a Lesson (has 'blocks' or 'dialogue')
+              else if (item.blocks || item.dialogue) {
+                   const ref = doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id);
+                   batch.set(ref, {
+                       ...item,
+                       vocab: Array.isArray(item.vocab) ? item.vocab : [],
+                       xp: item.xp || 100
+                   });
+                   count++;
               }
           });
+          
           await batch.commit();
           alert(`Successfully imported ${count} items.`);
           setJsonInput('');
@@ -636,7 +658,6 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
   
   const handleEditDeck = (deckId) => {
       setBuilderMode('deck');
-      // Pass initialDeckId to CardBuilder logic if we extracted it better, for now simpler toggle
       setView('builder'); 
   };
 
@@ -678,10 +699,16 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
         
         {/* Admin Import Zone in Sidebar for easy access */}
         <div className="pt-6 border-t border-slate-100">
-           <div className="mb-4">
-             <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Bulk Import (AI)</h4>
-             <textarea value={jsonInput} onChange={e => setJsonInput(e.target.value)} className="w-full p-2 text-xs border rounded bg-slate-50 mb-2" placeholder="Paste JSON array..." rows={2}></textarea>
-             <button onClick={handleBulkImport} disabled={!jsonInput} className="w-full bg-slate-800 text-white text-xs py-1 rounded disabled:opacity-50 flex items-center justify-center gap-1"><FileJson size={12}/> Import</button>
+           <div className="mb-4 px-2">
+             <div className="flex justify-between items-center mb-2">
+                <h4 className="text-xs font-bold text-slate-400 uppercase">AI Import</h4>
+                <div className="flex bg-slate-100 rounded p-0.5">
+                    <button onClick={() => setImportMode('lesson')} className={`px-2 py-0.5 text-[10px] rounded ${importMode === 'lesson' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}>Lesson</button>
+                    <button onClick={() => setImportMode('deck')} className={`px-2 py-0.5 text-[10px] rounded ${importMode === 'deck' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}>Deck</button>
+                </div>
+             </div>
+             <textarea value={jsonInput} onChange={e => setJsonInput(e.target.value)} className="w-full p-2 text-xs border rounded bg-slate-50 mb-2 font-mono" placeholder={importMode === 'lesson' ? '[{"title": "...", "blocks": [...]}]' : '[{"title": "My Deck", "cards": [{"front": "...", "back": "..."}]}]'} rows={3}></textarea>
+             <button onClick={handleBulkImport} disabled={!jsonInput} className="w-full bg-slate-800 text-white text-xs py-1 rounded disabled:opacity-50 flex items-center justify-center gap-1"><FileJson size={12}/> Import {importMode === 'lesson' ? 'Lessons' : 'Decks'}</button>
            </div>
           <div className="flex items-center gap-3 px-2 mb-4">
             <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs">{userData?.name?.charAt(0)}</div>
@@ -786,7 +813,7 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
           <div className="h-full flex flex-col md:flex-row gap-6 animate-in fade-in duration-500">
             <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50"><div className="flex items-center gap-3"><h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText size={18} /> Creator</h3><div className="flex bg-slate-100 p-0.5 rounded-lg"><button onClick={() => setBuilderMode('lesson')} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'lesson' ? 'bg-white shadow-sm' : ''}`}>Lesson</button><button onClick={() => setBuilderMode('deck')} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'deck' ? 'bg-white shadow-sm' : ''}`}>Deck</button></div></div><button className="text-xs font-bold text-indigo-600 hover:underline" onClick={() => { setBuilderData({ title: '', subtitle: '', description: '', vocab: '', blocks: [] }); setEditingId(null); }}>Clear Form</button></div>
-              <div className="flex-1 overflow-y-auto p-0">{builderMode === 'lesson' ? <LessonBuilderView data={builderData} setData={setBuilderData} onSave={handleSaveWithEdit} /> : <CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} />}</div>
+              <div className="flex-1 overflow-y-auto p-0">{builderMode === 'lesson' ? <LessonBuilderView data={builderData} setData={setBuilderData} onSave={handleSaveWithEdit} /> : <CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} initialDeckId={editingId} />}</div>
             </div>
             {builderMode === 'lesson' && <div className="w-full md:w-[400px] bg-white rounded-[3rem] border-[8px] border-slate-900/10 shadow-xl overflow-hidden flex flex-col relative"><div className="flex-1 overflow-hidden bg-slate-50"><LessonView lesson={previewLesson} onFinish={() => alert("Preview Finished")} /></div><div className="bg-slate-100 p-2 text-center text-xs text-slate-400 font-bold uppercase tracking-wider border-t border-slate-200">Student Preview</div></div>}
           </div>
