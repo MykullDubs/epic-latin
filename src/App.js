@@ -184,14 +184,7 @@ const Header = ({ title, subtitle, rightAction, onClickTitle }) => (
 
 const CardBuilderView = ({ onSaveCard, availableDecks }) => {
   const [formData, setFormData] = useState({
-    front: '', 
-    back: '', 
-    type: 'noun',
-    ipa: '',
-    sentence: '',
-    sentenceTrans: '',
-    grammarTags: '',
-    deckId: 'custom' // Default to custom/scriptorium
+    front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', deckId: 'custom'
   });
   
   const [morphology, setMorphology] = useState([]);
@@ -218,18 +211,14 @@ const CardBuilderView = ({ onSaveCard, availableDecks }) => {
       front: formData.front,
       back: formData.back,
       type: formData.type,
-      deckId: formData.deckId, // Pass the selected deck ID
+      deckId: formData.deckId,
       ipa: formData.ipa || "/.../",
       mastery: 0,
       morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }],
-      usage: { 
-        sentence: formData.sentence || "-", 
-        translation: formData.sentenceTrans || "-" 
-      },
+      usage: { sentence: formData.sentence || "-", translation: formData.sentenceTrans || "-" },
       grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"]
     }); 
     
-    // Reset form but keep deck selection
     setFormData({ ...formData, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }); 
     setMorphology([]);
     alert("Card Created!");
@@ -695,7 +684,7 @@ const ProfileView = ({ user, userData }) => {
 // --- HOME VIEW ---
 const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData }) => (
   <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full">
-    <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." />
+    <Header title={`Ave, ${userData?.name}!`} subtitle="Perge in itinere tuo." />
     <div className="px-6 space-y-6 mt-4">
       <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl"><div className="flex justify-between"><div><p className="text-rose-100 text-sm font-bold uppercase">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp} XP</h3></div><Zap size={28} className="text-yellow-400 fill-current"/></div><div className="mt-6 bg-black/20 rounded-full h-3"><div className="bg-yellow-400 h-full w-3/4 rounded-full"/></div></div>
       <div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3><div className="space-y-3">{lessons.map(l => (<button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-14 w-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700"><PlayCircle size={28}/></div><div className="text-left"><h4 className="font-bold text-slate-900">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div></div><ChevronRight className="text-slate-300"/></button>))}</div></div>
@@ -967,23 +956,7 @@ const App = () => {
   const [activeLesson, setActiveLesson] = useState(null);
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
 
-  // Derived Data: MERGE custom cards into system decks if they belong there, or keep them in 'custom'
-  const allDecks = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
-  
-  // Ensure custom deck exists in derived state
-  if (!allDecks.custom) allDecks.custom = { title: "✍️ Scriptorium", cards: [] };
-
-  // Distribute Custom Cards
-  customCards.forEach(card => {
-      const target = card.deckId || 'custom';
-      if (allDecks[target]) {
-          if (!allDecks[target].cards) allDecks[target].cards = [];
-          allDecks[target].cards.push(card);
-      } else {
-          allDecks.custom.cards.push(card);
-      }
-  });
-
+  const allDecks = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: customCards } };
   const lessons = [...systemLessons, ...customLessons];
 
   useEffect(() => { const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); }); return () => unsubscribe(); }, []);
@@ -996,9 +969,6 @@ const App = () => {
     const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => { if (docSnap.exists()) setUserData(docSnap.data()); else setUserData(DEFAULT_USER_DATA); });
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    
-    // In a real app, we might fetch system content from Firestore public path, but hardcoded is safer for immediate stability
-    // const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), ...
     
     return () => { unsubProfile(); unsubCards(); unsubLessons(); };
   }, [user]);
