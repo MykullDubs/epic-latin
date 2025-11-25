@@ -62,7 +62,9 @@ import {
   Eye,
   AlignLeft,
   HelpCircle,
-  Pencil
+  Pencil,
+  Image,
+  Info
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -124,6 +126,11 @@ const INITIAL_SYSTEM_LESSONS = [
         type: 'text',
         title: 'The Basics',
         content: 'In Latin, we distinguish between addressing one person ("Salve") and multiple people ("Salvete").'
+      },
+      {
+        type: 'note',
+        title: 'Grammar Tip',
+        content: 'Latin uses different verb endings depending on who you are speaking to. This is called conjugation.'
       },
       {
         type: 'dialogue',
@@ -348,14 +355,23 @@ const LessonBuilderView = ({ data, setData, onSave }) => {
   const [toastMsg, setToastMsg] = useState(null);
   const updateBlock = (index, field, value) => { const newBlocks = [...(data.blocks || [])]; newBlocks[index] = { ...newBlocks[index], [field]: value }; setData({ ...data, blocks: newBlocks }); };
   const updateDialogueLine = (blockIndex, lineIndex, field, value) => { const newBlocks = [...(data.blocks || [])]; newBlocks[blockIndex].lines[lineIndex][field] = value; setData({ ...data, blocks: newBlocks }); };
-  const addBlock = (type) => { const baseBlock = type === 'dialogue' ? { type: 'dialogue', lines: [{ speaker: 'A', text: '', translation: '', side: 'left' }] } : type === 'quiz' ? { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' } : { type: 'text', title: '', content: '' }; setData({ ...data, blocks: [...(data.blocks || []), baseBlock] }); };
+  const updateVocabItem = (blockIndex, itemIndex, field, value) => { const newBlocks = [...(data.blocks || [])]; newBlocks[blockIndex].items[itemIndex][field] = value; setData({ ...data, blocks: newBlocks }); };
+  
+  const addBlock = (type) => { 
+    const baseBlock = type === 'dialogue' ? { type: 'dialogue', lines: [{ speaker: 'A', text: '', translation: '', side: 'left' }] } 
+      : type === 'quiz' ? { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' } 
+      : type === 'vocab-list' ? { type: 'vocab-list', items: [{ term: '', definition: '' }] }
+      : type === 'image' ? { type: 'image', url: '', caption: '' }
+      : type === 'note' ? { type: 'note', title: '', content: '' }
+      : { type: 'text', title: '', content: '' }; // text
+    setData({ ...data, blocks: [...(data.blocks || []), baseBlock] }); 
+  };
+  
   const removeBlock = (index) => { const newBlocks = [...(data.blocks || [])].filter((_, i) => i !== index); setData({ ...data, blocks: newBlocks }); };
   
   const handleSave = () => { 
     if (!data.title) return alert("Title required"); 
-    // FIXED: Handle potential array vocab by joining if needed, or just fallback
     const processedVocab = Array.isArray(data.vocab) ? data.vocab : (typeof data.vocab === 'string' ? data.vocab.split(',').map(s => s.trim()) : []);
-
     onSave({ ...data, vocab: processedVocab, xp: 100 }); 
     setToastMsg("Lesson Saved Successfully");
   };
@@ -369,13 +385,29 @@ const LessonBuilderView = ({ data, setData, onSave }) => {
         {(data.blocks || []).map((block, idx) => (
           <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative group">
             <div className="absolute right-4 top-4 flex gap-2"><span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-2 py-1 rounded">{block.type}</span><button onClick={() => removeBlock(idx)} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div>
+            
             {block.type === 'text' && (<div className="space-y-3 mt-4"><input className="w-full p-2 border-b border-slate-100 font-bold text-sm focus:outline-none" placeholder="Section Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} /><textarea className="w-full p-2 bg-slate-50 rounded-lg text-sm min-h-[80px]" placeholder="Content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} /></div>)}
+            
+            {block.type === 'note' && (<div className="space-y-3 mt-4"><div className="flex gap-2"><Info size={18} className="text-amber-500"/><input className="flex-1 p-2 border-b border-slate-100 font-bold text-sm focus:outline-none" placeholder="Note Title (e.g. Grammar Tip)" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} /></div><textarea className="w-full p-2 bg-amber-50 border border-amber-100 rounded-lg text-sm min-h-[80px] text-amber-800" placeholder="Tip content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} /></div>)}
+
+            {block.type === 'image' && (<div className="space-y-3 mt-4"><div className="flex gap-2 items-center"><Image size={18} className="text-slate-400"/><input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Image URL" value={block.url} onChange={e => updateBlock(idx, 'url', e.target.value)} /></div><input className="w-full p-2 bg-slate-50 rounded-lg text-sm" placeholder="Caption" value={block.caption} onChange={e => updateBlock(idx, 'caption', e.target.value)} /></div>)}
+
+            {block.type === 'vocab-list' && (<div className="space-y-3 mt-6"><p className="text-xs font-bold text-slate-400 uppercase">Vocabulary List</p>{block.items.map((item, i) => (<div key={i} className="flex gap-2"><input className="flex-1 p-2 bg-slate-50 rounded border border-slate-100 text-sm font-bold" placeholder="Term" value={item.term} onChange={e => updateVocabItem(idx, i, 'term', e.target.value)} /><input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Definition" value={item.definition} onChange={e => updateVocabItem(idx, i, 'definition', e.target.value)} /></div>))}<button onClick={() => { const newItems = [...block.items, { term: '', definition: '' }]; updateBlock(idx, 'items', newItems); }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Add Term</button></div>)}
+
             {block.type === 'dialogue' && (<div className="space-y-3 mt-6">{block.lines.map((line, lIdx) => (<div key={lIdx} className="flex gap-2 text-sm"><input className="w-16 p-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold" placeholder="Speaker" value={line.speaker} onChange={e => updateDialogueLine(idx, lIdx, 'speaker', e.target.value)} /><div className="flex-1 space-y-1"><input className="w-full p-1 border-b border-slate-100" placeholder="Latin" value={line.text} onChange={e => updateDialogueLine(idx, lIdx, 'text', e.target.value)} /><input className="w-full p-1 text-xs text-slate-500 italic" placeholder="English" value={line.translation} onChange={e => updateDialogueLine(idx, lIdx, 'translation', e.target.value)} /></div></div>))}<button onClick={() => { const newLines = [...block.lines, { speaker: 'B', text: '', translation: '', side: 'right' }]; updateBlock(idx, 'lines', newLines); }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Add Line</button></div>)}
+            
             {block.type === 'quiz' && (<div className="space-y-3 mt-4"><input className="w-full p-2 bg-slate-50 rounded-lg font-bold text-sm" placeholder="Question" value={block.question} onChange={e => updateBlock(idx, 'question', e.target.value)} /><div className="space-y-1"><p className="text-[10px] font-bold text-slate-400 uppercase">Options (ID, Text)</p>{block.options.map((opt, oIdx) => (<div key={oIdx} className="flex gap-2"><input className="w-8 p-1 bg-slate-50 text-center text-xs" value={opt.id} readOnly /><input className="flex-1 p-1 border-b border-slate-100 text-sm" value={opt.text} onChange={(e) => { const newOpts = [...block.options]; newOpts[oIdx].text = e.target.value; updateBlock(idx, 'options', newOpts); }} /></div>))}</div><div className="flex items-center gap-2 text-sm mt-2"><span className="text-slate-500">Correct ID:</span><input className="w-10 p-1 bg-green-50 border border-green-200 rounded text-center font-bold text-green-700" value={block.correctId} onChange={e => updateBlock(idx, 'correctId', e.target.value)} /></div></div>)}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-3 gap-2"><button onClick={() => addBlock('text')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><AlignLeft size={20}/> <span className="text-[10px] font-bold">Text</span></button><button onClick={() => addBlock('dialogue')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><MessageSquare size={20}/> <span className="text-[10px] font-bold">Dialogue</span></button><button onClick={() => addBlock('quiz')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><HelpCircle size={20}/> <span className="text-[10px] font-bold">Quiz</span></button></div>
+      <div className="grid grid-cols-3 gap-2">
+        <button onClick={() => addBlock('text')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><AlignLeft size={20}/> <span className="text-[10px] font-bold">Text</span></button>
+        <button onClick={() => addBlock('dialogue')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><MessageSquare size={20}/> <span className="text-[10px] font-bold">Dialogue</span></button>
+        <button onClick={() => addBlock('quiz')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><HelpCircle size={20}/> <span className="text-[10px] font-bold">Quiz</span></button>
+        <button onClick={() => addBlock('vocab-list')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><List size={20}/> <span className="text-[10px] font-bold">Vocab List</span></button>
+        <button onClick={() => addBlock('image')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><Image size={20}/> <span className="text-[10px] font-bold">Image</span></button>
+        <button onClick={() => addBlock('note')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><Info size={20}/> <span className="text-[10px] font-bold">Note</span></button>
+      </div>
       <div className="pt-4 border-t border-slate-100"><button onClick={handleSave} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform"><Save size={20} /> Save Lesson to Library</button></div>
     </div>
   );
@@ -542,7 +574,13 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
       <div className="w-64 bg-white border-r border-slate-200 flex flex-col p-6 hidden md:flex">
         <div className="flex items-center gap-3 mb-10 px-2"><div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg"><GraduationCap size={24} /></div><div><h1 className="font-bold text-lg leading-none">LinguistFlow</h1><span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Magister Mode</span></div></div>
         <div className="space-y-2 flex-1"><NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" /><NavItem id="classes" icon={School} label="My Classes" /><NavItem id="library" icon={Library} label="Content Library" /><NavItem id="builder" icon={PlusCircle} label="Content Creator" /></div>
-        <div className="pt-6 border-t border-slate-100"><button onClick={onLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><LogOut size={16} /> Sign Out</button></div>
+        <div className="pt-6 border-t border-slate-100">
+          <div className="flex items-center gap-3 px-2 mb-4">
+            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs">{userData?.name?.charAt(0)}</div>
+            <div className="flex-1 overflow-hidden"><p className="text-sm font-bold truncate">{userData?.name}</p><p className="text-xs text-slate-400 truncate">{user.email}</p></div>
+          </div>
+          <button onClick={onLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><LogOut size={16} /> Sign Out</button>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-6 max-w-6xl mx-auto h-full">
         {view === 'dashboard' && (
@@ -704,6 +742,47 @@ const LessonView = ({ lesson, onFinish }) => {
       );
     }
 
+    if (block.type === 'note') {
+      return (
+        <div className="space-y-4 animate-in fade-in duration-500">
+          <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <Info size={20} className="text-amber-600" />
+              <h3 className="text-lg font-bold text-amber-900">{block.title || 'Note'}</h3>
+            </div>
+            <p className="text-amber-800 leading-relaxed">{block.content}</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (block.type === 'image') {
+      return (
+        <div className="space-y-4 animate-in fade-in duration-500">
+          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
+            <img src={block.url} alt={block.caption} className="w-full h-64 object-cover rounded-xl mb-3 bg-slate-100" />
+            {block.caption && <p className="text-center text-sm text-slate-500 italic">{block.caption}</p>}
+          </div>
+        </div>
+      );
+    }
+
+    if (block.type === 'vocab-list') {
+      return (
+        <div className="space-y-4 animate-in fade-in duration-500">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2"><List size={18} className="text-indigo-600"/> Vocabulary</h3>
+          <div className="grid grid-cols-1 gap-2">
+            {block.items.map((item, i) => (
+              <div key={i} className="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center">
+                <span className="font-bold text-slate-900">{item.term}</span>
+                <span className="text-slate-500">{item.definition}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     if (block.type === 'dialogue') {
       return (
         <div className="space-y-4 animate-in fade-in duration-500">
@@ -800,7 +879,7 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) 
     });
     setQuickAddData({ front: '', back: '', type: 'noun' });
     setSearchTerm(''); 
-    // Removed basic alert, parent handles feedback or we can add toast here if needed
+    alert("Card Added!");
   };
 
   if (!card && !manageMode) return <div className="h-full flex flex-col bg-slate-50"><Header title={currentDeck?.title || "Empty Deck"} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<button onClick={() => setManageMode(true)} className="p-2 bg-slate-100 rounded-full"><List size={20} className="text-slate-600" /></button>} /><div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400"><Layers size={48} className="mb-4 opacity-20" /><p>This deck is empty.</p><button onClick={() => setManageMode(true)} className="mt-4 text-indigo-600 font-bold text-sm">Add Cards</button></div></div>;
