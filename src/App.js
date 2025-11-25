@@ -131,6 +131,7 @@ const TYPE_COLORS = {
   noun: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
   adverb: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
   phrase: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
+  adjective: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' }
 };
 
 // --- SHARED COMPONENTS ---
@@ -167,26 +168,151 @@ const Header = ({ title, subtitle, rightAction, onClickTitle }) => (
 // --- BUILDER COMPONENTS ---
 
 const CardBuilderView = ({ onSaveCard }) => {
-  const [formData, setFormData] = useState({ front: '', back: '', type: 'noun' });
+  const [formData, setFormData] = useState({
+    front: '', 
+    back: '', 
+    type: 'noun',
+    ipa: '',
+    sentence: '',
+    sentenceTrans: '',
+    grammarTags: ''
+  });
+  
+  // Morphology state
+  const [morphology, setMorphology] = useState([]);
+  const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
+
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+
+  const addMorphology = () => {
+    if (newMorphPart.part && newMorphPart.meaning) {
+      setMorphology([...morphology, newMorphPart]);
+      setNewMorphPart({ part: '', meaning: '', type: 'root' });
+    }
+  };
+
+  const removeMorphology = (index) => {
+    setMorphology(morphology.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = (e) => { 
     e.preventDefault(); 
-    if (!formData.front) return; 
+    if (!formData.front || !formData.back) return; 
+    
     onSaveCard({ 
-      ...formData, ipa: "/.../", mastery: 0, 
-      morphology: [{ part: formData.front, meaning: "Custom", type: "root" }], 
-      usage: { sentence: "-", translation: "-" }, grammar_tags: ["Custom"] 
+      front: formData.front,
+      back: formData.back,
+      type: formData.type,
+      ipa: formData.ipa || "/.../",
+      mastery: 0,
+      morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }],
+      usage: { 
+        sentence: formData.sentence || "-", 
+        translation: formData.sentenceTrans || "-" 
+      },
+      grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"]
     }); 
-    setFormData({ front: '', back: '', type: 'noun' }); 
+    
+    // Reset
+    setFormData({ front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }); 
+    setMorphology([]);
     alert("Card Created!");
   };
+
   return (
-    <form onSubmit={handleSubmit} className="px-6 mt-4 space-y-5">
-      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800 font-bold">Add cards to your custom deck.</div>
-      <div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase">Latin</label><input name="front" value={formData.front} onChange={handleChange} className="w-full p-4 rounded-xl border border-slate-200 font-bold" /></div>
-      <div className="space-y-2"><label className="text-xs font-bold text-slate-500 uppercase">English</label><input name="back" value={formData.back} onChange={handleChange} className="w-full p-4 rounded-xl border border-slate-200" /></div>
-      <button type="submit" className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg"><Save size={20} className="inline mr-2"/>Create Card</button>
-    </form>
+    <div className="px-6 mt-4 space-y-6 pb-20">
+      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800">
+        <p className="font-bold flex items-center gap-2"><Layers size={16}/> Advanced Card Creator</p>
+        <p className="opacity-80 text-xs mt-1">Define deep linguistic data for your flashcards.</p>
+      </div>
+
+      {/* Basic Info */}
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Core Data</h3>
+        <div className="grid grid-cols-2 gap-4">
+           <div className="space-y-2">
+             <label className="text-xs font-bold text-slate-400">Latin Word</label>
+             <input name="front" value={formData.front} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="e.g. Bellum" />
+           </div>
+           <div className="space-y-2">
+             <label className="text-xs font-bold text-slate-400">English</label>
+             <input name="back" value={formData.back} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="e.g. War" />
+           </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+             <label className="text-xs font-bold text-slate-400">Part of Speech</label>
+             <select name="type" value={formData.type} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-white">
+               <option value="noun">Noun</option>
+               <option value="verb">Verb</option>
+               <option value="adjective">Adjective</option>
+               <option value="adverb">Adverb</option>
+               <option value="phrase">Phrase</option>
+             </select>
+           </div>
+           <div className="space-y-2">
+             <label className="text-xs font-bold text-slate-400">IPA / Pronunciation</label>
+             <input name="ipa" value={formData.ipa} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-mono text-sm" placeholder="/ˈbel.lum/" />
+           </div>
+        </div>
+      </section>
+
+      {/* Morphology Builder */}
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Morphology (Roots & Parts)</h3>
+        
+        <div className="flex gap-2 items-end">
+           <div className="flex-1 space-y-1">
+             <label className="text-[10px] font-bold text-slate-400">Part (Latin)</label>
+             <input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="Bell-" />
+           </div>
+           <div className="flex-1 space-y-1">
+             <label className="text-[10px] font-bold text-slate-400">Meaning</label>
+             <input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="War" />
+           </div>
+           <div className="w-24 space-y-1">
+             <label className="text-[10px] font-bold text-slate-400">Type</label>
+             <select value={newMorphPart.type} onChange={(e) => setNewMorphPart({...newMorphPart, type: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm bg-white">
+               <option value="root">Root</option>
+               <option value="prefix">Prefix</option>
+               <option value="suffix">Suffix</option>
+             </select>
+           </div>
+           <button onClick={addMorphology} type="button" className="bg-indigo-100 text-indigo-600 p-2 rounded-lg hover:bg-indigo-200"><Plus size={20}/></button>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mt-2">
+          {morphology.map((m, i) => (
+            <div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full text-sm">
+              <span className="font-bold text-indigo-700">{m.part}</span>
+              <span className="text-slate-500 text-xs">({m.meaning})</span>
+              <button onClick={() => removeMorphology(i)} className="text-slate-300 hover:text-rose-500"><X size={14}/></button>
+            </div>
+          ))}
+          {morphology.length === 0 && <p className="text-xs text-slate-400 italic">No morphology parts added yet.</p>}
+        </div>
+      </section>
+
+      {/* Context & Grammar */}
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Context & Grammar</h3>
+        <div className="space-y-2">
+           <label className="text-xs font-bold text-slate-400">Example Sentence (Latin)</label>
+           <input name="sentence" value={formData.sentence} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 italic" placeholder="Si vis pacem, para bellum." />
+        </div>
+        <div className="space-y-2">
+           <label className="text-xs font-bold text-slate-400">Sentence Translation</label>
+           <input name="sentenceTrans" value={formData.sentenceTrans} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="If you want peace, prepare for war." />
+        </div>
+        <div className="space-y-2">
+           <label className="text-xs font-bold text-slate-400">Grammar Tags (comma separated)</label>
+           <input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="2nd Declension, Neuter, Abstract" />
+        </div>
+      </section>
+
+      <button onClick={handleSubmit} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Save Complete Card</button>
+    </div>
   );
 };
 
@@ -412,6 +538,7 @@ const ProfileView = ({ user, userData }) => {
     setDeploying(false);
   };
   const toggleRole = async () => {
+    if (!userData) return; // Guard clause
     const newRole = userData.role === 'instructor' ? 'student' : 'instructor';
     await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole });
   };
@@ -595,8 +722,6 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-  
-  // Data State
   const [systemDecks, setSystemDecks] = useState({});
   const [systemLessons, setSystemLessons] = useState([]);
   const [customCards, setCustomCards] = useState([]);
