@@ -482,6 +482,7 @@ const ClassManagerView = ({ user, lessons }) => {
   const [newClassName, setNewClassName] = useState('');
   const [newStudentEmail, setNewStudentEmail] = useState('');
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState(null);
 
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'users', user.uid, 'classes');
@@ -496,11 +497,12 @@ const ClassManagerView = ({ user, lessons }) => {
         name: newClassName, 
         code: Math.random().toString(36).substring(2, 8).toUpperCase(), 
         students: [], 
-        studentEmails: [], // Array to store emails for querying
+        studentEmails: [], 
         assignments: [], 
         created: Date.now() 
     });
     setNewClassName('');
+    setToastMsg("Class Created Successfully");
   };
 
   const handleDeleteClass = async (id) => {
@@ -513,27 +515,29 @@ const ClassManagerView = ({ user, lessons }) => {
   const addStudent = async (e) => {
     e.preventDefault();
     if (!newStudentEmail || !selectedClass) return;
-    // Update both students (legacy display) and studentEmails (for querying)
     await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { 
         students: arrayUnion(newStudentEmail),
         studentEmails: arrayUnion(newStudentEmail)
     });
     setSelectedClass(prev => ({...prev, students: [...(prev.students || []), newStudentEmail]}));
     setNewStudentEmail('');
+    setToastMsg(`Added ${newStudentEmail}`);
   };
 
   const assignLesson = async (lesson) => {
     if (!selectedClass) return;
     await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { 
-        assignments: arrayUnion(lesson) // Storing the full lesson object
+        assignments: arrayUnion(lesson) 
     });
     setSelectedClass(prev => ({...prev, assignments: [...(prev.assignments || []), lesson]}));
     setAssignModalOpen(false);
+    setToastMsg(`Assigned: ${lesson.title}`);
   };
 
   if (selectedClass) {
     return (
-      <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300">
+      <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300 relative">
+        {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
         <div className="pb-6 border-b border-slate-100 mb-6">
           <button onClick={() => setSelectedClass(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
           <div className="flex justify-between items-end">
@@ -572,7 +576,8 @@ const ClassManagerView = ({ user, lessons }) => {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 relative">
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-800">My Classes</h2>
         <form onSubmit={createClass} className="flex gap-2"><input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="p-2 rounded-lg border border-slate-200 text-sm w-64" /><button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2"><Plus size={16}/> Create</button></form>
@@ -908,19 +913,9 @@ const ProfileView = ({ user, userData }) => {
 const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData }) => (
   <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full">
     <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." />
-    
     <div className="px-6 space-y-6 mt-4">
-      {/* Stat Card */}
-      <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl shadow-rose-200 relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition-transform duration-700" />
-        <div className="flex justify-between items-start relative z-10">
-          <div><p className="text-rose-100 font-medium mb-1 text-sm uppercase tracking-wider">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp || 0} <span className="text-lg font-sans font-normal text-rose-200">XP</span></h3></div>
-          <div className="bg-white/10 p-2.5 rounded-xl backdrop-blur-md border border-white/20"><Zap size={28} className="text-yellow-400" fill="currentColor" /></div>
-        </div>
-        <div className="mt-6 bg-black/20 rounded-full h-3 w-full overflow-hidden"><div className="bg-gradient-to-r from-yellow-300 to-amber-500 h-full w-[75%] rounded-full" /></div>
-        <div className="flex justify-between mt-3 text-xs font-medium text-rose-100"><span>Rank: Centurion</span><span>{userData?.streak || 1} Dies Igne 🔥</span></div>
-      </div>
-
+      <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl"><div className="flex justify-between"><div><p className="text-rose-100 text-sm font-bold uppercase">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp} XP</h3></div><Zap size={28} className="text-yellow-400 fill-current"/></div><div className="mt-6 bg-black/20 rounded-full h-3"><div className="bg-yellow-400 h-full w-3/4 rounded-full"/></div></div>
+      
       {/* Class Assignments Section */}
       {userData?.classAssignments && userData.classAssignments.length > 0 && (
         <div>
@@ -939,31 +934,8 @@ const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData }) => (
         </div>
       )}
 
-      <div>
-        <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600" /> Available Lessons</h3>
-        <div className="space-y-3">
-          {lessons.map(lesson => (
-            <button key={lesson.id} onClick={() => onSelectLesson(lesson)} className="w-full bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:shadow-md group">
-              <div className="flex items-center space-x-4">
-                <div className="h-14 w-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700 group-hover:bg-amber-200 transition-colors"><PlayCircle size={28} /></div>
-                <div className="text-left"><h4 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{lesson.title}</h4><p className="text-xs text-slate-500">{lesson.subtitle || 'Custom Lesson'}</p></div>
-              </div>
-              <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-600 transition-colors" />
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <button onClick={() => setActiveTab('flashcards')} className="p-5 bg-orange-50 rounded-2xl border border-orange-100 flex flex-col items-center justify-center text-center space-y-3 hover:bg-orange-100 active:scale-95 transition-all">
-          <div className="bg-white p-3 rounded-full shadow-sm"><Layers className="text-orange-500" size={24} /></div>
-          <div><span className="block font-bold text-slate-800">Repetitio</span><span className="text-xs text-slate-500">Smart Deck</span></div>
-        </button>
-        <button onClick={() => setActiveTab('create')} className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 flex flex-col items-center justify-center text-center space-y-3 hover:bg-emerald-100 active:scale-95 transition-all">
-          <div className="bg-white p-3 rounded-full shadow-sm"><Feather className="text-emerald-500" size={24} /></div>
-          <div><span className="block font-bold text-slate-800">Scriptorium</span><span className="text-xs text-slate-500">Build Content</span></div>
-        </button>
-      </div>
+      <div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3><div className="space-y-3">{lessons.map(l => (<button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-14 w-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700"><PlayCircle size={28}/></div><div className="text-left"><h4 className="font-bold text-slate-900">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div></div><ChevronRight className="text-slate-300"/></button>))}</div></div>
+      <div className="grid grid-cols-2 gap-4"><button onClick={() => setActiveTab('flashcards')} className="p-5 bg-orange-50 rounded-2xl border border-orange-100 text-center"><Layers className="mx-auto text-orange-500 mb-2"/><span className="block font-bold text-slate-800">Repetitio</span></button><button onClick={() => setActiveTab('create')} className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 text-center"><Feather className="mx-auto text-emerald-500 mb-2"/><span className="block font-bold text-slate-800">Scriptorium</span></button></div>
     </div>
   </div>
 );
@@ -1163,7 +1135,7 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) 
     });
     setQuickAddData({ front: '', back: '', type: 'noun' });
     setSearchTerm(''); 
-    alert("Card Added!");
+    // Removed basic alert, parent handles feedback or we can add toast here if needed
   };
 
   if (!card && !manageMode) return <div className="h-full flex flex-col bg-slate-50"><Header title={currentDeck?.title || "Empty Deck"} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<button onClick={() => setManageMode(true)} className="p-2 bg-slate-100 rounded-full"><List size={20} className="text-slate-600" /></button>} /><div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400"><Layers size={48} className="mb-4 opacity-20" /><p>This deck is empty.</p><button onClick={() => setManageMode(true)} className="mt-4 text-indigo-600 font-bold text-sm">Add Cards</button></div></div>;
