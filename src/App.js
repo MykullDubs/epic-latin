@@ -207,7 +207,7 @@ const Header = ({ title, subtitle, rightAction, onClickTitle }) => (
 
 // --- BUILDER COMPONENTS ---
 
-const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId }) => {
+const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
   const [formData, setFormData] = useState({
     front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', deckId: initialDeckId || 'custom'
   });
@@ -247,28 +247,6 @@ const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
     setMorphology(morphology.filter((_, i) => i !== index));
   };
 
-  const handleSelectCard = (card) => {
-    setEditingId(card.id);
-    setFormData({
-      front: card.front,
-      back: card.back,
-      type: card.type || 'noun',
-      ipa: card.ipa || '',
-      sentence: card.usage?.sentence || '',
-      sentenceTrans: card.usage?.translation || '',
-      grammarTags: card.grammar_tags?.join(', ') || '',
-      deckId: formData.deckId // Keep current deck selection
-    });
-    setMorphology(card.morphology || []);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleClear = () => {
-    setEditingId(null);
-    setFormData(prev => ({ ...prev, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }));
-    setMorphology([]);
-  };
-
   const handleSubmit = (e) => { 
     e.preventDefault(); 
     if (!formData.front || !formData.back) return; 
@@ -294,16 +272,11 @@ const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
       usage: { sentence: formData.sentence || "-", translation: formData.sentenceTrans || "-" },
       grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"]
     };
-
-    if (editingId) {
-      onUpdateCard(editingId, cardData);
-      setToastMsg("Card Updated Successfully");
-    } else {
-      onSaveCard(cardData);
-      setToastMsg("Card Created Successfully");
-    }
     
-    handleClear();
+    onSaveCard(cardData);
+    setToastMsg("Card Saved Successfully");
+    setFormData({ ...formData, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }); 
+    setMorphology([]);
     if (isCreatingDeck) {
         setIsCreatingDeck(false);
         setNewDeckTitle('');
@@ -312,19 +285,14 @@ const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
   };
 
   const deckOptions = availableDecks ? Object.entries(availableDecks).map(([key, deck]) => ({ id: key, title: deck.title })) : [];
-  
-  const currentDeckCards = availableDecks && availableDecks[formData.deckId] ? availableDecks[formData.deckId].cards : [];
 
   return (
     <div className="px-6 mt-4 space-y-6 pb-20 relative">
       {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
       
-      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800 flex justify-between items-center">
-        <div>
-          <p className="font-bold flex items-center gap-2"><Layers size={16}/> {editingId ? 'Editing Card' : 'Card Creator'}</p>
-          <p className="opacity-80 text-xs mt-1">{editingId ? 'Update details below.' : 'Define deep linguistic data (X-Ray).'}</p>
-        </div>
-        {editingId && <button onClick={handleClear} className="text-xs font-bold bg-white px-3 py-1 rounded-lg shadow-sm hover:text-indigo-600">Cancel Edit</button>}
+      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800">
+        <p className="font-bold flex items-center gap-2"><Layers size={16}/> Advanced Card Creator</p>
+        <p className="opacity-80 text-xs mt-1">Define deep linguistic data (X-Ray) for your flashcards.</p>
       </div>
 
       <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
@@ -333,7 +301,7 @@ const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
         {/* DECK SELECTOR */}
         <div className="space-y-2">
             <label className="text-xs font-bold text-slate-400">Target Deck</label>
-            <select name="deckId" value={formData.deckId} onChange={handleChange} disabled={!!editingId} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900 disabled:opacity-50">
+            <select name="deckId" value={formData.deckId} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900">
               <option value="custom">✍️ Scriptorium (My Deck)</option>
               {deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}
               <option value="new">✨ + Create New Deck</option>
@@ -383,31 +351,7 @@ const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
         <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Grammar Tags</label><input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="2nd Declension, Neuter" /></div>
       </section>
 
-      <button onClick={handleSubmit} className={`w-full text-white p-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${editingId ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
-          {editingId ? <><Save size={20}/> Update Card</> : <><Plus size={20}/> Create Card</>}
-      </button>
-
-      {/* EXISTING CARDS LIST */}
-      {currentDeckCards && currentDeckCards.length > 0 && (
-        <div className="pt-6 border-t border-slate-200">
-            <h3 className="font-bold text-slate-800 mb-4">Cards in this Deck ({currentDeckCards.length})</h3>
-            <div className="space-y-2">
-                {currentDeckCards.map((card, idx) => (
-                    <div key={idx} onClick={() => handleSelectCard(card)} className={`p-3 rounded-xl border flex justify-between items-center cursor-pointer transition-colors ${editingId === card.id ? 'bg-indigo-50 border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-300'}`}>
-                        <div>
-                            <span className="font-bold text-slate-800">{card.front}</span>
-                            <span className="text-slate-400 mx-2">•</span>
-                            <span className="text-sm text-slate-500">{card.back}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                           <Edit3 size={16} className="text-indigo-400" />
-                           <button onClick={(e) => { e.stopPropagation(); onDeleteCard(card.id); }} className="p-1 text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-      )}
+      <button onClick={handleSubmit} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Save Card</button>
     </div>
   );
 };
@@ -478,11 +422,14 @@ const LessonBuilderView = ({ data, setData, onSave }) => {
 
 const ClassManagerView = ({ user, lessons }) => {
   const [classes, setClasses] = useState([]);
-  const [selectedClass, setSelectedClass] = useState(null);
+  const [selectedClassId, setSelectedClassId] = useState(null); // CHANGED: Track ID instead of object
   const [newClassName, setNewClassName] = useState('');
   const [newStudentEmail, setNewStudentEmail] = useState('');
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
+
+  // Derive selectedClass from the live classes array
+  const selectedClass = classes.find(c => c.id === selectedClassId);
 
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'users', user.uid, 'classes');
@@ -508,18 +455,20 @@ const ClassManagerView = ({ user, lessons }) => {
   const handleDeleteClass = async (id) => {
       if (window.confirm("Delete this class?")) {
         await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id));
-        if (selectedClass?.id === id) setSelectedClass(null);
+        if (selectedClassId === id) setSelectedClassId(null);
       }
     };
 
   const addStudent = async (e) => {
     e.preventDefault();
     if (!newStudentEmail || !selectedClass) return;
+    
+    // Just update DB. The snapshot listener will update 'classes', which updates 'selectedClass'
     await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { 
-        students: arrayUnion(newStudentEmail),
-        studentEmails: arrayUnion(newStudentEmail)
+        students: arrayUnion(newStudentEmail), // Legacy display
+        studentEmails: arrayUnion(newStudentEmail) // Critical for student query
     });
-    setSelectedClass(prev => ({...prev, students: [...(prev.students || []), newStudentEmail]}));
+    
     setNewStudentEmail('');
     setToastMsg(`Added ${newStudentEmail}`);
   };
@@ -527,9 +476,8 @@ const ClassManagerView = ({ user, lessons }) => {
   const assignLesson = async (lesson) => {
     if (!selectedClass) return;
     await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { 
-        assignments: arrayUnion(lesson) 
+        assignments: arrayUnion(lesson) // Storing full object
     });
-    setSelectedClass(prev => ({...prev, assignments: [...(prev.assignments || []), lesson]}));
     setAssignModalOpen(false);
     setToastMsg(`Assigned: ${lesson.title}`);
   };
@@ -539,7 +487,7 @@ const ClassManagerView = ({ user, lessons }) => {
       <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300 relative">
         {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
         <div className="pb-6 border-b border-slate-100 mb-6">
-          <button onClick={() => setSelectedClass(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
+          <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
           <div className="flex justify-between items-end">
             <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
             <button onClick={() => setAssignModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm"><Plus size={16}/> Assign</button>
@@ -584,7 +532,7 @@ const ClassManagerView = ({ user, lessons }) => {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {classes.map(cls => (
-          <div key={cls.id} onClick={() => setSelectedClass(cls)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group">
+          <div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group">
             <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={(e) => {e.stopPropagation(); handleDeleteClass(cls.id);}} className="text-slate-300 hover:text-rose-500"><Trash2 size={18}/></button></div>
             <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div>
             <h3 className="font-bold text-lg text-slate-900">{cls.name}</h3>
@@ -1300,6 +1248,8 @@ const App = () => {
         });
         // Dedup by ID if needed, but simple push is fine for now
         setClassLessons(newAssignments);
+        // Update user profile local state for UI
+        setUserData(prev => ({...prev, classAssignments: newAssignments}));
     }, (error) => {
         console.log("Class sync error (likely needs index):", error);
     });
