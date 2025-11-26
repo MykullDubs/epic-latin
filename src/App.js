@@ -92,7 +92,10 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = 'epic-latin-prod'; 
+
+// FIXED: Use dynamic appId from environment if available, or fallback to prod
+// This ensures data persistence matches the current deployment context
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'epic-latin-prod'; 
 
 // --- DEFAULTS ---
 const DEFAULT_USER_DATA = {
@@ -217,6 +220,7 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
   const [morphology, setMorphology] = useState([]);
   const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
   const [toastMsg, setToastMsg] = useState(null);
+  const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
     if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId}));
@@ -260,7 +264,7 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
         finalDeckTitle = newDeckTitle;
     }
 
-    onSaveCard({ 
+    const cardData = { 
       front: formData.front,
       back: formData.back,
       type: formData.type,
@@ -271,8 +275,13 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
       morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }],
       usage: { sentence: formData.sentence || "-", translation: formData.sentenceTrans || "-" },
       grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"]
-    }); 
+    };
+
+    // No specific update hook needed for create, handled by parent or direct logic here
+    onSaveCard(cardData); // onSaveCard handles both create and adding to correct collection
+    setToastMsg("Card Saved Successfully");
     
+    // Reset
     setFormData({ ...formData, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }); 
     setMorphology([]);
     if (isCreatingDeck) {
@@ -280,25 +289,28 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
         setNewDeckTitle('');
         setFormData(prev => ({ ...prev, deckId: finalDeckId })); 
     }
-    setToastMsg("Card Saved Successfully");
   };
 
   const deckOptions = availableDecks ? Object.entries(availableDecks).map(([key, deck]) => ({ id: key, title: deck.title })) : [];
-
+  
   return (
     <div className="px-6 mt-4 space-y-6 pb-20 relative">
       {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
       
-      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800">
-        <p className="font-bold flex items-center gap-2"><Layers size={16}/> Advanced Card Creator</p>
+      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800 flex justify-between items-center">
+        <div>
+          <p className="font-bold flex items-center gap-2"><Layers size={16}/> {editingId ? 'Editing Card' : 'Card Creator'}</p>
+          <p className="opacity-80 text-xs mt-1">{editingId ? 'Update details below.' : 'Define deep linguistic data (X-Ray).'}</p>
+        </div>
       </div>
 
       <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
         <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Core Data</h3>
         
+        {/* DECK SELECTOR */}
         <div className="space-y-2">
             <label className="text-xs font-bold text-slate-400">Target Deck</label>
-            <select name="deckId" value={formData.deckId} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900">
+            <select name="deckId" value={formData.deckId} onChange={handleChange} disabled={!!editingId} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900 disabled:opacity-50">
               <option value="custom">✍️ Scriptorium (My Deck)</option>
               {deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}
               <option value="new">✨ + Create New Deck</option>
@@ -348,7 +360,9 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
         <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Grammar Tags</label><input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="2nd Declension, Neuter" /></div>
       </section>
 
-      <button onClick={handleSubmit} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Save Card</button>
+      <button onClick={handleSubmit} className={`w-full text-white p-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${editingId ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+          {editingId ? <><Save size={20}/> Update Card</> : <><Plus size={20}/> Create Card</>}
+      </button>
     </div>
   );
 };
@@ -419,74 +433,83 @@ const LessonBuilderView = ({ data, setData, onSave }) => {
 
 const ClassManagerView = ({ user, lessons }) => {
   const [classes, setClasses] = useState([]);
-  const [selectedClass, setSelectedClass] = useState(null);
+  const [selectedClassId, setSelectedClassId] = useState(null);
   const [newClassName, setNewClassName] = useState('');
   const [newStudentEmail, setNewStudentEmail] = useState('');
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
 
+  // Derive selectedClass from the live classes array
+  const selectedClass = classes.find(c => c.id === selectedClassId);
+
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'users', user.uid, 'classes');
-    const unsubscribe = onSnapshot(q, (snapshot) => setClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    const unsubscribe = onSnapshot(q, (snapshot) => setClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))), (error) => console.error("Class snapshot error:", error));
     return () => unsubscribe();
   }, [user]);
 
   const createClass = async (e) => {
     e.preventDefault();
     if (!newClassName.trim()) return;
-    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), { 
-        name: newClassName, 
-        code: Math.random().toString(36).substring(2, 8).toUpperCase(), 
-        students: [], 
-        studentEmails: [], 
-        assignments: [], 
-        created: Date.now() 
-    });
-    setNewClassName('');
-    setToastMsg("Class Created Successfully");
+    try {
+        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), { 
+            name: newClassName, 
+            code: Math.random().toString(36).substring(2, 8).toUpperCase(), 
+            students: [], 
+            studentEmails: [], 
+            assignments: [], 
+            created: Date.now() 
+        });
+        setNewClassName('');
+        setToastMsg("Class Created Successfully");
+    } catch (error) {
+        console.error("Create class failed:", error);
+        alert("Failed to create class. Check permissions.");
+    }
   };
 
   const handleDeleteClass = async (id) => {
       if (window.confirm("Delete this class?")) {
-        await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id));
-        if (selectedClass?.id === id) setSelectedClass(null);
+        try {
+            await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id));
+            if (selectedClassId === id) setSelectedClassId(null);
+        } catch (error) {
+            console.error("Delete class failed:", error);
+            alert("Failed to delete class.");
+        }
       }
     };
 
   const addStudent = async (e) => {
     e.preventDefault();
     if (!newStudentEmail || !selectedClass) return;
-    // Lowercase email to ensure matching works
     const normalizedEmail = newStudentEmail.toLowerCase().trim();
-    
-    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { 
-        students: arrayUnion(normalizedEmail), 
-        studentEmails: arrayUnion(normalizedEmail) 
-    });
-    
-    setSelectedClass(prev => ({
-        ...prev, 
-        students: [...(prev.students || []), normalizedEmail],
-        studentEmails: [...(prev.studentEmails || []), normalizedEmail]
-    }));
-    
-    setNewStudentEmail('');
-    setToastMsg(`Added ${normalizedEmail}`);
+    try {
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { 
+            students: arrayUnion(normalizedEmail), 
+            studentEmails: arrayUnion(normalizedEmail) 
+        });
+        setNewStudentEmail('');
+        setToastMsg(`Added ${normalizedEmail}`);
+    } catch (error) {
+        console.error("Add student failed:", error);
+        alert("Failed to add student.");
+    }
   };
 
   const assignLesson = async (lesson) => {
     if (!selectedClass) return;
-    
-    // Sanitize lesson object
-    const cleanLesson = JSON.parse(JSON.stringify(lesson));
-    
-    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { 
-        assignments: arrayUnion(cleanLesson) 
-    });
-    
-    setSelectedClass(prev => ({...prev, assignments: [...(prev.assignments || []), cleanLesson]}));
-    setAssignModalOpen(false);
-    setToastMsg(`Assigned: ${lesson.title}`);
+    try {
+        const cleanLesson = JSON.parse(JSON.stringify(lesson)); // Sanitize
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { 
+            assignments: arrayUnion(cleanLesson) 
+        });
+        setAssignModalOpen(false);
+        setToastMsg(`Assigned: ${lesson.title}`);
+    } catch (error) {
+        console.error("Assign lesson failed:", error);
+        alert("Failed to assign lesson.");
+    }
   };
 
   if (selectedClass) {
@@ -494,7 +517,7 @@ const ClassManagerView = ({ user, lessons }) => {
       <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300 relative">
         {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
         <div className="pb-6 border-b border-slate-100 mb-6">
-          <button onClick={() => setSelectedClass(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
+          <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
           <div className="flex justify-between items-end">
             <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
             <button onClick={() => setAssignModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm"><Plus size={16}/> Assign</button>
@@ -539,7 +562,7 @@ const ClassManagerView = ({ user, lessons }) => {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {classes.map(cls => (
-          <div key={cls.id} onClick={() => setSelectedClass(cls)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group">
+          <div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group">
             <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={(e) => {e.stopPropagation(); handleDeleteClass(cls.id);}} className="text-slate-300 hover:text-rose-500"><Trash2 size={18}/></button></div>
             <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div>
             <h3 className="font-bold text-lg text-slate-900">{cls.name}</h3>
