@@ -92,10 +92,7 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-// FIXED: Use dynamic appId from environment if available, or fallback to prod
-// This ensures data persistence matches the current deployment context
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'epic-latin-prod'; 
+const appId = 'epic-latin-prod'; 
 
 // --- DEFAULTS ---
 const DEFAULT_USER_DATA = {
@@ -276,12 +273,9 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
       usage: { sentence: formData.sentence || "-", translation: formData.sentenceTrans || "-" },
       grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"]
     };
-
-    // No specific update hook needed for create, handled by parent or direct logic here
-    onSaveCard(cardData); // onSaveCard handles both create and adding to correct collection
-    setToastMsg("Card Saved Successfully");
     
-    // Reset
+    onSaveCard(cardData); 
+    setToastMsg("Card Saved Successfully");
     setFormData({ ...formData, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }); 
     setMorphology([]);
     if (isCreatingDeck) {
@@ -297,11 +291,9 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
     <div className="px-6 mt-4 space-y-6 pb-20 relative">
       {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
       
-      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800 flex justify-between items-center">
-        <div>
-          <p className="font-bold flex items-center gap-2"><Layers size={16}/> {editingId ? 'Editing Card' : 'Card Creator'}</p>
-          <p className="opacity-80 text-xs mt-1">{editingId ? 'Update details below.' : 'Define deep linguistic data (X-Ray).'}</p>
-        </div>
+      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800">
+        <p className="font-bold flex items-center gap-2"><Layers size={16}/> Advanced Card Creator</p>
+        <p className="opacity-80 text-xs mt-1">Define deep linguistic data (X-Ray) for your flashcards.</p>
       </div>
 
       <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
@@ -360,9 +352,7 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
         <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Grammar Tags</label><input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="2nd Declension, Neuter" /></div>
       </section>
 
-      <button onClick={handleSubmit} className={`w-full text-white p-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${editingId ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
-          {editingId ? <><Save size={20}/> Update Card</> : <><Plus size={20}/> Create Card</>}
-      </button>
+      <button onClick={handleSubmit} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"><Save size={20} /> Save Card</button>
     </div>
   );
 };
@@ -888,7 +878,7 @@ const ProfileView = ({ user, userData }) => {
 };
 
 // --- HOME VIEW ---
-const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData, assignments }) => (
+const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes }) => (
   <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full">
     
     {/* MISSING INDEX ALERT */}
@@ -904,10 +894,29 @@ const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData, assignments
     <div className="px-6 space-y-6 mt-4">
       <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl"><div className="flex justify-between"><div><p className="text-rose-100 text-sm font-bold uppercase">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp} XP</h3></div><Zap size={28} className="text-yellow-400 fill-current"/></div><div className="mt-6 bg-black/20 rounded-full h-3"><div className="bg-yellow-400 h-full w-3/4 rounded-full"/></div></div>
       
+      {/* Classes Widget */}
+      {classes && classes.length > 0 && (
+        <div className="mb-6">
+           <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><School size={18} className="text-indigo-600"/> My Classes</h3>
+           <div className="flex gap-4 overflow-x-auto pb-4">
+             {classes.map(cls => (
+               <div key={cls.id} className="min-w-[200px] bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                 <div className="flex items-center justify-between mb-2">
+                   <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">{cls.name.charAt(0)}</div>
+                   <span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{cls.code}</span>
+                 </div>
+                 <h4 className="font-bold text-slate-900">{cls.name}</h4>
+                 <p className="text-xs text-slate-500 mt-1">{cls.assignments?.length || 0} Assignments</p>
+               </div>
+             ))}
+           </div>
+        </div>
+      )}
+
       {/* Class Assignments Section */}
       {assignments && assignments.length > 0 && (
         <div>
-          <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><School size={18} className="text-indigo-600"/> Class Assignments</h3>
+          <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
           <div className="space-y-3">
             {assignments.map((l, i) => (
                <button key={`${l.id}-${i}`} onClick={() => onSelectLesson(l)} className="w-full bg-indigo-50 border border-indigo-100 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all">
@@ -1275,7 +1284,9 @@ const App = () => {
     const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => { const l = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (l.length === 0) setSystemLessons(INITIAL_SYSTEM_LESSONS); else setSystemLessons(l); });
     
     // Enrolled Classes Listener
-    const qEnrolled = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
+    const currentEmail = user.email ? user.email.toLowerCase() : '';
+    const qEnrolled = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', currentEmail));
+    
     const unsubClasses = onSnapshot(qEnrolled, (snapshot) => {
         const cls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setEnrolledClasses(cls);
@@ -1288,10 +1299,10 @@ const App = () => {
         });
         // Dedup by ID if needed, but simple push is fine for now
         setClassLessons(newAssignments);
-        // Update user profile local state for UI
-        setUserData(prev => ({...prev, classAssignments: newAssignments}));
     }, (error) => {
         console.log("Class sync error (likely needs index):", error);
+        // Optionally flag user data to show alert
+        setUserData(prev => ({...prev, classSyncError: true}));
     });
 
     return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); unsubClasses(); };
@@ -1342,7 +1353,7 @@ const App = () => {
 
   const renderStudentView = () => {
     switch (activeTab) {
-      case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} assignments={classLessons} onSelectLesson={(l) => { setActiveLesson(l); setActiveTab('lesson'); }} userData={userData} />;
+      case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectLesson={(l) => { setActiveLesson(l); setActiveTab('lesson'); }} userData={userData} />;
       case 'lesson': return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} />;
       case 'flashcards': return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} />;
       case 'create': return <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} />;
