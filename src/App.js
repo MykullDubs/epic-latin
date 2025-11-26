@@ -92,7 +92,7 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = 'epic-latin-prod'; 
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'epic-latin-prod';
 
 // --- DEFAULTS ---
 const DEFAULT_USER_DATA = {
@@ -217,7 +217,6 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
   const [morphology, setMorphology] = useState([]);
   const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
   const [toastMsg, setToastMsg] = useState(null);
-  const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
     if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId}));
@@ -293,7 +292,6 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
       
       <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800">
         <p className="font-bold flex items-center gap-2"><Layers size={16}/> Advanced Card Creator</p>
-        <p className="opacity-80 text-xs mt-1">Define deep linguistic data (X-Ray) for your flashcards.</p>
       </div>
 
       <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
@@ -302,7 +300,7 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
         {/* DECK SELECTOR */}
         <div className="space-y-2">
             <label className="text-xs font-bold text-slate-400">Target Deck</label>
-            <select name="deckId" value={formData.deckId} onChange={handleChange} disabled={!!editingId} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900 disabled:opacity-50">
+            <select name="deckId" value={formData.deckId} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900">
               <option value="custom">✍️ Scriptorium (My Deck)</option>
               {deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}
               <option value="new">✨ + Create New Deck</option>
@@ -1284,9 +1282,7 @@ const App = () => {
     const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => { const l = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (l.length === 0) setSystemLessons(INITIAL_SYSTEM_LESSONS); else setSystemLessons(l); });
     
     // Enrolled Classes Listener
-    const currentEmail = user.email ? user.email.toLowerCase() : '';
-    const qEnrolled = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', currentEmail));
-    
+    const qEnrolled = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
     const unsubClasses = onSnapshot(qEnrolled, (snapshot) => {
         const cls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setEnrolledClasses(cls);
@@ -1299,6 +1295,8 @@ const App = () => {
         });
         // Dedup by ID if needed, but simple push is fine for now
         setClassLessons(newAssignments);
+        // Update user profile local state for UI
+        setUserData(prev => ({...prev, classAssignments: newAssignments}));
     }, (error) => {
         console.log("Class sync error (likely needs index):", error);
         // Optionally flag user data to show alert
