@@ -910,18 +910,18 @@ const ProfileView = ({ user, userData }) => {
 };
 
 // --- HOME VIEW ---
-const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData }) => (
+const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData, assignments }) => (
   <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full">
     <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." />
     <div className="px-6 space-y-6 mt-4">
       <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl"><div className="flex justify-between"><div><p className="text-rose-100 text-sm font-bold uppercase">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp} XP</h3></div><Zap size={28} className="text-yellow-400 fill-current"/></div><div className="mt-6 bg-black/20 rounded-full h-3"><div className="bg-yellow-400 h-full w-3/4 rounded-full"/></div></div>
       
       {/* Class Assignments Section */}
-      {userData?.classAssignments && userData.classAssignments.length > 0 && (
+      {assignments && assignments.length > 0 && (
         <div>
           <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><School size={18} className="text-indigo-600"/> Class Assignments</h3>
           <div className="space-y-3">
-            {userData.classAssignments.map(l => (
+            {assignments.map(l => (
                <button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-indigo-50 border border-indigo-100 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all">
                   <div className="flex items-center space-x-4">
                     <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center text-indigo-600"><PlayCircle size={20} /></div>
@@ -1135,7 +1135,7 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) 
     });
     setQuickAddData({ front: '', back: '', type: 'noun' });
     setSearchTerm(''); 
-    // Removed basic alert, parent handles feedback or we can add toast here if needed
+    alert("Card Added!");
   };
 
   if (!card && !manageMode) return <div className="h-full flex flex-col bg-slate-50"><Header title={currentDeck?.title || "Empty Deck"} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<button onClick={() => setManageMode(true)} className="p-2 bg-slate-100 rounded-full"><List size={20} className="text-slate-600" /></button>} /><div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400"><Layers size={48} className="mb-4 opacity-20" /><p>This deck is empty.</p><button onClick={() => setManageMode(true)} className="mt-4 text-indigo-600 font-bold text-sm">Add Cards</button></div></div>;
@@ -1300,8 +1300,8 @@ const App = () => {
         });
         // Dedup by ID if needed, but simple push is fine for now
         setClassLessons(newAssignments);
-        // Update user profile local state for UI
-        setUserData(prev => ({...prev, classAssignments: newAssignments}));
+    }, (error) => {
+        console.log("Class sync error (likely needs index):", error);
     });
 
     return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); unsubClasses(); };
@@ -1352,7 +1352,7 @@ const App = () => {
 
   const renderStudentView = () => {
     switch (activeTab) {
-      case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} onSelectLesson={(l) => { setActiveLesson(l); setActiveTab('lesson'); }} userData={userData} />;
+      case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} assignments={classLessons} onSelectLesson={(l) => { setActiveLesson(l); setActiveTab('lesson'); }} userData={userData} />;
       case 'lesson': return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} />;
       case 'flashcards': return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} />;
       case 'create': return <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} />;
