@@ -73,7 +73,8 @@ import {
   Activity,
   Calendar,
   FileJson,
-  AlertTriangle
+  AlertTriangle,
+  FlipVertical
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -205,6 +206,115 @@ const Header = ({ title, subtitle, rightAction, onClickTitle }) => (
     {rightAction}
   </div>
 );
+
+// --- SPECIAL LESSON COMPONENTS ---
+
+const VocabMatchBlock = ({ items }) => {
+  const [selectedTerm, setSelectedTerm] = useState(null);
+  const [matches, setMatches] = useState(new Set());
+  const [shuffledDefs, setShuffledDefs] = useState([]);
+  const [isCorrect, setIsCorrect] = useState(null);
+
+  useEffect(() => {
+    const defs = items.map((item, i) => ({ def: item.definition, originalIndex: i }));
+    // Fisher-Yates shuffle
+    for (let i = defs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [defs[i], defs[j]] = [defs[j], defs[i]];
+    }
+    setShuffledDefs(defs);
+  }, [items]);
+
+  const handleTermClick = (index) => {
+    if (matches.has(index)) return;
+    setSelectedTerm(index);
+    setIsCorrect(null);
+  };
+
+  const handleDefClick = (defObj) => {
+    if (selectedTerm === null) return;
+    if (selectedTerm === defObj.originalIndex) {
+      const newMatches = new Set(matches);
+      newMatches.add(selectedTerm);
+      setMatches(newMatches);
+      setSelectedTerm(null);
+      setIsCorrect(true);
+      setTimeout(() => setIsCorrect(null), 800);
+    } else {
+      setIsCorrect(false);
+      setTimeout(() => setIsCorrect(null), 800);
+    }
+  };
+
+  if (matches.size === items.length && items.length > 0) {
+     return (
+         <div className="bg-emerald-50 p-8 rounded-3xl text-center border border-emerald-100 animate-in zoom-in">
+             <Check size={48} className="mx-auto text-emerald-500 mb-4"/>
+             <h3 className="text-xl font-bold text-emerald-900">Perfect Match!</h3>
+             <p className="text-emerald-700 text-sm mt-1">You've mastered these terms.</p>
+         </div>
+     )
+  }
+
+  return (
+    <div className="space-y-4 animate-in fade-in duration-500">
+      <h3 className="font-bold text-slate-800 flex items-center gap-2"><List size={18} className="text-indigo-600"/> Vocabulary Match</h3>
+      <p className="text-xs text-slate-500">Tap a term on the left, then its definition on the right.</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+           {items.map((item, i) => (
+             <button 
+                key={`term-${i}`} 
+                disabled={matches.has(i)}
+                onClick={() => handleTermClick(i)}
+                className={`w-full p-3 rounded-xl text-left text-sm font-bold transition-all border-2 ${
+                    matches.has(i) ? 'bg-emerald-50 border-emerald-100 text-emerald-300 opacity-50 scale-95' :
+                    selectedTerm === i ? (isCorrect === false ? 'bg-red-50 border-red-200 text-red-700 animate-pulse' : 'bg-indigo-50 border-indigo-500 text-indigo-700 scale-105') :
+                    'bg-white border-slate-100 text-slate-700 hover:border-indigo-200'
+                }`}
+             >
+               {item.term}
+             </button>
+           ))}
+        </div>
+        <div className="space-y-2">
+           {shuffledDefs.map((defObj, i) => (
+             <button 
+                key={`def-${i}`}
+                disabled={matches.has(defObj.originalIndex)}
+                onClick={() => handleDefClick(defObj)}
+                className={`w-full p-3 rounded-xl text-left text-sm transition-all border-2 ${
+                    matches.has(defObj.originalIndex) ? 'bg-emerald-50 border-emerald-100 text-emerald-300 opacity-50 scale-95' :
+                    'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'
+                }`}
+             >
+               {defObj.def}
+             </button>
+           ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const FlashcardBlock = ({ front, back }) => {
+    const [flipped, setFlipped] = useState(false);
+    return (
+        <div className="perspective-1000 h-64 cursor-pointer" onClick={() => setFlipped(!flipped)}>
+            <div className={`relative w-full h-full transition-transform duration-500 transform preserve-3d ${flipped ? 'rotate-y-180' : ''}`}>
+                <div className="absolute inset-0 backface-hidden bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center justify-center p-6">
+                    <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-2">Flashcard</span>
+                    <h3 className="text-3xl font-serif font-bold text-slate-800 text-center">{front}</h3>
+                    <p className="text-xs text-slate-300 mt-8 animate-pulse">Tap to flip</p>
+                </div>
+                <div className="absolute inset-0 backface-hidden rotate-y-180 bg-slate-800 rounded-3xl shadow-lg flex flex-col items-center justify-center p-6 text-white">
+                    <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest mb-2">Definition</span>
+                    <h3 className="text-2xl font-bold text-center">{back}</h3>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // --- BUILDER COMPONENTS ---
 
@@ -423,6 +533,7 @@ const LessonBuilderView = ({ data, setData, onSave, availableDecks }) => {
     const baseBlock = type === 'dialogue' ? { type: 'dialogue', lines: [{ speaker: 'A', text: '', translation: '', side: 'left' }] } 
       : type === 'quiz' ? { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' } 
       : type === 'vocab-list' ? { type: 'vocab-list', items: [{ term: '', definition: '' }] }
+      : type === 'flashcard' ? { type: 'flashcard', front: '', back: '' }
       : type === 'image' ? { type: 'image', url: '', caption: '' }
       : type === 'note' ? { type: 'note', title: '', content: '' }
       : { type: 'text', title: '', content: '' }; // text
@@ -475,6 +586,8 @@ const LessonBuilderView = ({ data, setData, onSave, availableDecks }) => {
 
             {block.type === 'vocab-list' && (<div className="space-y-3 mt-6"><p className="text-xs font-bold text-slate-400 uppercase">Vocabulary List</p>{block.items.map((item, i) => (<div key={i} className="flex gap-2"><input className="flex-1 p-2 bg-slate-50 rounded border border-slate-100 text-sm font-bold" placeholder="Term" value={item.term} onChange={e => updateVocabItem(idx, i, 'term', e.target.value)} /><input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Definition" value={item.definition} onChange={e => updateVocabItem(idx, i, 'definition', e.target.value)} /></div>))}<button onClick={() => { const newItems = [...block.items, { term: '', definition: '' }]; updateBlock(idx, 'items', newItems); }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Add Term</button></div>)}
 
+            {block.type === 'flashcard' && (<div className="space-y-3 mt-4"><div className="flex gap-2"><FlipVertical size={18} className="text-indigo-500"/><span className="text-sm font-bold text-slate-700">Embedded Flashcard</span></div><input className="w-full p-2 border rounded text-sm font-bold" placeholder="Front (Latin)" value={block.front} onChange={e => updateBlock(idx, 'front', e.target.value)} /><input className="w-full p-2 border rounded text-sm" placeholder="Back (English)" value={block.back} onChange={e => updateBlock(idx, 'back', e.target.value)} /></div>)}
+
             {block.type === 'dialogue' && (<div className="space-y-3 mt-6">{block.lines.map((line, lIdx) => (<div key={lIdx} className="flex gap-2 text-sm"><input className="w-16 p-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold" placeholder="Speaker" value={line.speaker} onChange={e => updateDialogueLine(idx, lIdx, 'speaker', e.target.value)} /><div className="flex-1 space-y-1"><input className="w-full p-1 border-b border-slate-100" placeholder="Latin" value={line.text} onChange={e => updateDialogueLine(idx, lIdx, 'text', e.target.value)} /><input className="w-full p-1 text-xs text-slate-500 italic" placeholder="English" value={line.translation} onChange={e => updateDialogueLine(idx, lIdx, 'translation', e.target.value)} /></div></div>))}<button onClick={() => { const newLines = [...block.lines, { speaker: 'B', text: '', translation: '', side: 'right' }]; updateBlock(idx, 'lines', newLines); }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Add Line</button></div>)}
             
             {block.type === 'quiz' && (<div className="space-y-3 mt-4"><input className="w-full p-2 bg-slate-50 rounded-lg font-bold text-sm" placeholder="Question" value={block.question} onChange={e => updateBlock(idx, 'question', e.target.value)} /><div className="space-y-1"><p className="text-[10px] font-bold text-slate-400 uppercase">Options (ID, Text)</p>{block.options.map((opt, oIdx) => (<div key={oIdx} className="flex gap-2"><input className="w-8 p-1 bg-slate-50 text-center text-xs" value={opt.id} readOnly /><input className="flex-1 p-1 border-b border-slate-100 text-sm" value={opt.text} onChange={(e) => { const newOpts = [...block.options]; newOpts[oIdx].text = e.target.value; updateBlock(idx, 'options', newOpts); }} /></div>))}</div><div className="flex items-center gap-2 text-sm mt-2"><span className="text-slate-500">Correct ID:</span><input className="w-10 p-1 bg-green-50 border border-green-200 rounded text-center font-bold text-green-700" value={block.correctId} onChange={e => updateBlock(idx, 'correctId', e.target.value)} /></div></div>)}
@@ -486,6 +599,7 @@ const LessonBuilderView = ({ data, setData, onSave, availableDecks }) => {
         <button onClick={() => addBlock('dialogue')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><MessageSquare size={20}/> <span className="text-[10px] font-bold">Dialogue</span></button>
         <button onClick={() => addBlock('quiz')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><HelpCircle size={20}/> <span className="text-[10px] font-bold">Quiz</span></button>
         <button onClick={() => addBlock('vocab-list')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><List size={20}/> <span className="text-[10px] font-bold">Vocab List</span></button>
+        <button onClick={() => addBlock('flashcard')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><FlipVertical size={20}/> <span className="text-[10px] font-bold">Flashcard</span></button>
         <button onClick={() => addBlock('image')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><Image size={20}/> <span className="text-[10px] font-bold">Image</span></button>
         <button onClick={() => addBlock('note')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><Info size={20}/> <span className="text-[10px] font-bold">Note</span></button>
       </div>
@@ -1410,7 +1524,6 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [activeStudentClass, setActiveStudentClass] = useState(null);
   
   // Data State
   const [systemDecks, setSystemDecks] = useState({});
@@ -1547,10 +1660,6 @@ const App = () => {
   if (userData.role === 'instructor') return <InstructorDashboard user={user} userData={userData} allDecks={allDecks} lessons={lessons} onSaveLesson={handleCreateLesson} onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onLogout={() => signOut(auth)} />;
 
   const renderStudentView = () => {
-    if (activeStudentClass) {
-        return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={(l) => { setActiveLesson(l); setActiveTab('lesson'); }} userData={userData} />;
-    }
-
     switch (activeTab) {
       case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c) => setActiveStudentClass(c)} onSelectLesson={(l) => { setActiveLesson(l); setActiveTab('lesson'); }} userData={userData} />;
       case 'lesson': return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} />;
