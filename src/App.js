@@ -101,7 +101,8 @@ const DEFAULT_USER_DATA = {
   level: "Novice",
   streak: 1,
   xp: 0,
-  role: 'student'
+  role: 'student',
+  completedAssignments: [] // Track completed lesson IDs
 };
 
 // --- SEED DATA ---
@@ -295,9 +296,12 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
       usage: { sentence: formData.sentence || "-", translation: formData.sentenceTrans || "-" },
       grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"]
     };
-    
-    onSaveCard(cardData); 
+
+    // No specific update hook needed for create, handled by parent or direct logic here
+    onSaveCard(cardData); // onSaveCard handles both create and adding to correct collection
     setToastMsg("Card Saved Successfully");
+    
+    // Reset
     setFormData({ ...formData, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }); 
     setMorphology([]);
     if (isCreatingDeck) {
@@ -726,6 +730,7 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
             <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs">{userData?.name?.charAt(0)}</div>
             <div className="flex-1 overflow-hidden"><p className="text-sm font-bold truncate">{userData?.name}</p><p className="text-xs text-slate-400 truncate">{user.email}</p></div>
           </div>
+          <button onClick={toggleRole} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg transition-colors mb-1">{roleLoading ? <Loader className="animate-spin" size={16}/> : <BookOpen size={16} />} Switch to Student</button>
           <button onClick={onLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><LogOut size={16} /> Sign Out</button>
         </div>
       </div>
