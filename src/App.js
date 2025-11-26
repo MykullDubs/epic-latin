@@ -1,4 +1,4 @@
-So the instructor page is doing great with the two functions we talked about. THe problem now is the learner dashboard. I want the lessons assigned by the indtructor to the student to populate there. Can we make it happen?import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { 
@@ -72,7 +72,8 @@ import {
   TrendingUp,
   Activity,
   Calendar,
-  FileJson
+  FileJson,
+  AlertTriangle
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -216,7 +217,6 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
   const [morphology, setMorphology] = useState([]);
   const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
   const [toastMsg, setToastMsg] = useState(null);
-  const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
     if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId}));
@@ -260,7 +260,7 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
         finalDeckTitle = newDeckTitle;
     }
 
-    const cardData = { 
+    onSaveCard({ 
       front: formData.front,
       back: formData.back,
       type: formData.type,
@@ -271,10 +271,8 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
       morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }],
       usage: { sentence: formData.sentence || "-", translation: formData.sentenceTrans || "-" },
       grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"]
-    };
+    }); 
     
-    onSaveCard(cardData);
-    setToastMsg("Card Saved Successfully");
     setFormData({ ...formData, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }); 
     setMorphology([]);
     if (isCreatingDeck) {
@@ -282,6 +280,7 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
         setNewDeckTitle('');
         setFormData(prev => ({ ...prev, deckId: finalDeckId })); 
     }
+    setToastMsg("Card Saved Successfully");
   };
 
   const deckOptions = availableDecks ? Object.entries(availableDecks).map(([key, deck]) => ({ id: key, title: deck.title })) : [];
@@ -292,13 +291,11 @@ const CardBuilderView = ({ onSaveCard, availableDecks, initialDeckId }) => {
       
       <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800">
         <p className="font-bold flex items-center gap-2"><Layers size={16}/> Advanced Card Creator</p>
-        <p className="opacity-80 text-xs mt-1">Define deep linguistic data (X-Ray) for your flashcards.</p>
       </div>
 
       <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
         <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Core Data</h3>
         
-        {/* DECK SELECTOR */}
         <div className="space-y-2">
             <label className="text-xs font-bold text-slate-400">Target Deck</label>
             <select name="deckId" value={formData.deckId} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900">
@@ -422,14 +419,11 @@ const LessonBuilderView = ({ data, setData, onSave }) => {
 
 const ClassManagerView = ({ user, lessons }) => {
   const [classes, setClasses] = useState([]);
-  const [selectedClassId, setSelectedClassId] = useState(null); // CHANGED: Track ID instead of object
+  const [selectedClass, setSelectedClass] = useState(null);
   const [newClassName, setNewClassName] = useState('');
   const [newStudentEmail, setNewStudentEmail] = useState('');
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
-
-  // Derive selectedClass from the live classes array
-  const selectedClass = classes.find(c => c.id === selectedClassId);
 
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'users', user.uid, 'classes');
@@ -455,29 +449,42 @@ const ClassManagerView = ({ user, lessons }) => {
   const handleDeleteClass = async (id) => {
       if (window.confirm("Delete this class?")) {
         await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id));
-        if (selectedClassId === id) setSelectedClassId(null);
+        if (selectedClass?.id === id) setSelectedClass(null);
       }
     };
 
   const addStudent = async (e) => {
     e.preventDefault();
     if (!newStudentEmail || !selectedClass) return;
+    // Lowercase email to ensure matching works
+    const normalizedEmail = newStudentEmail.toLowerCase().trim();
     
-    // Just update DB. The snapshot listener will update 'classes', which updates 'selectedClass'
     await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { 
-        students: arrayUnion(newStudentEmail), // Legacy display
-        studentEmails: arrayUnion(newStudentEmail) // Critical for student query
+        students: arrayUnion(normalizedEmail), 
+        studentEmails: arrayUnion(normalizedEmail) 
     });
     
+    setSelectedClass(prev => ({
+        ...prev, 
+        students: [...(prev.students || []), normalizedEmail],
+        studentEmails: [...(prev.studentEmails || []), normalizedEmail]
+    }));
+    
     setNewStudentEmail('');
-    setToastMsg(`Added ${newStudentEmail}`);
+    setToastMsg(`Added ${normalizedEmail}`);
   };
 
   const assignLesson = async (lesson) => {
     if (!selectedClass) return;
+    
+    // Sanitize lesson object
+    const cleanLesson = JSON.parse(JSON.stringify(lesson));
+    
     await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { 
-        assignments: arrayUnion(lesson) // Storing full object
+        assignments: arrayUnion(cleanLesson) 
     });
+    
+    setSelectedClass(prev => ({...prev, assignments: [...(prev.assignments || []), cleanLesson]}));
     setAssignModalOpen(false);
     setToastMsg(`Assigned: ${lesson.title}`);
   };
@@ -487,7 +494,7 @@ const ClassManagerView = ({ user, lessons }) => {
       <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300 relative">
         {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
         <div className="pb-6 border-b border-slate-100 mb-6">
-          <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
+          <button onClick={() => setSelectedClass(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
           <div className="flex justify-between items-end">
             <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
             <button onClick={() => setAssignModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm"><Plus size={16}/> Assign</button>
@@ -532,7 +539,7 @@ const ClassManagerView = ({ user, lessons }) => {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {classes.map(cls => (
-          <div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group">
+          <div key={cls.id} onClick={() => setSelectedClass(cls)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group">
             <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={(e) => {e.stopPropagation(); handleDeleteClass(cls.id);}} className="text-slate-300 hover:text-rose-500"><Trash2 size={18}/></button></div>
             <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div>
             <h3 className="font-bold text-lg text-slate-900">{cls.name}</h3>
@@ -860,6 +867,16 @@ const ProfileView = ({ user, userData }) => {
 // --- HOME VIEW ---
 const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData, assignments }) => (
   <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full">
+    
+    {/* MISSING INDEX ALERT */}
+    {userData?.classSyncError && (
+       <div className="bg-rose-500 text-white p-4 text-center text-sm font-bold">
+           <AlertTriangle className="inline-block mr-2" size={16} />
+           System Notice: Database Index Missing.
+           <br/><span className="text-xs font-normal opacity-80">Instructors: Check console for the Firebase setup link.</span>
+       </div>
+    )}
+
     <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." />
     <div className="px-6 space-y-6 mt-4">
       <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl"><div className="flex justify-between"><div><p className="text-rose-100 text-sm font-bold uppercase">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp} XP</h3></div><Zap size={28} className="text-yellow-400 fill-current"/></div><div className="mt-6 bg-black/20 rounded-full h-3"><div className="bg-yellow-400 h-full w-3/4 rounded-full"/></div></div>
@@ -869,8 +886,8 @@ const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData, assignments
         <div>
           <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><School size={18} className="text-indigo-600"/> Class Assignments</h3>
           <div className="space-y-3">
-            {assignments.map(l => (
-               <button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-indigo-50 border border-indigo-100 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all">
+            {assignments.map((l, i) => (
+               <button key={`${l.id}-${i}`} onClick={() => onSelectLesson(l)} className="w-full bg-indigo-50 border border-indigo-100 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all">
                   <div className="flex items-center space-x-4">
                     <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center text-indigo-600"><PlayCircle size={20} /></div>
                     <div className="text-left"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-indigo-600/70">Assigned Lesson</p></div>
