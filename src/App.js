@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+So the instructor page is doing great with the two functions we talked about. THe problem now is the learner dashboard. I want the lessons assigned by the indtructor to the student to populate there. Can we make it happen?import React, { useState, useEffect } from 'react';
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { 
