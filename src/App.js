@@ -210,6 +210,7 @@ const Header = ({ title, subtitle, rightAction, onClickTitle }) => (
   </div>
 );
 
+
 // --- GAME COMPONENTS ---
 
 const VocabJack = ({ deckCards, onGameEnd }) => {
@@ -463,7 +464,96 @@ const MatchingGame = ({ deckCards, onGameEnd }) => {
     );
 };
 
-// --- HELPER COMPONENT: FLASHCARD BLOCK ---
+// --- SPECIAL LESSON COMPONENTS ---
+
+const VocabMatchBlock = ({ items }) => {
+  const [selectedTerm, setSelectedTerm] = useState(null);
+  const [matches, setMatches] = useState(new Set());
+  const [shuffledDefs, setShuffledDefs] = useState([]);
+  const [isCorrect, setIsCorrect] = useState(null);
+
+  useEffect(() => {
+    const defs = items.map((item, i) => ({ def: item.definition, originalIndex: i }));
+    // Fisher-Yates shuffle
+    for (let i = defs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [defs[i], defs[j]] = [defs[j], defs[i]];
+    }
+    setShuffledDefs(defs);
+  }, [items]);
+
+  const handleTermClick = (index) => {
+    if (matches.has(index)) return;
+    setSelectedTerm(index);
+    setIsCorrect(null);
+  };
+
+  const handleDefClick = (defObj) => {
+    if (selectedTerm === null) return;
+    if (selectedTerm === defObj.originalIndex) {
+      const newMatches = new Set(matches);
+      newMatches.add(selectedTerm);
+      setMatches(newMatches);
+      setSelectedTerm(null);
+      setIsCorrect(true);
+      setTimeout(() => setIsCorrect(null), 800);
+    } else {
+      setIsCorrect(false);
+      setTimeout(() => setIsCorrect(null), 800);
+    }
+  };
+
+  if (matches.size === items.length && items.length > 0) {
+      return (
+          <div className="bg-emerald-50 p-8 rounded-3xl text-center border border-emerald-100 animate-in zoom-in">
+              <Check size={48} className="mx-auto text-emerald-500 mb-4"/>
+              <h3 className="text-xl font-bold text-emerald-900">Perfect Match!</h3>
+              <p className="text-emerald-700 text-sm mt-1">You've mastered these terms.</p>
+          </div>
+      )
+  }
+
+  return (
+    <div className="space-y-4 animate-in fade-in duration-500">
+      <h3 className="font-bold text-slate-800 flex items-center gap-2"><List size={18} className="text-indigo-600"/> Vocabulary Match</h3>
+      <p className="text-xs text-slate-500">Tap a term on the left, then its definition on the right.</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+           {items.map((item, i) => (
+             <button 
+               key={`term-${i}`} 
+               disabled={matches.has(i)}
+               onClick={() => handleTermClick(i)}
+               className={`w-full p-3 rounded-xl text-left text-sm font-bold transition-all border-2 ${
+                   matches.has(i) ? 'bg-emerald-50 border-emerald-100 text-emerald-300 opacity-50 scale-95' :
+                   selectedTerm === i ? (isCorrect === false ? 'bg-red-50 border-red-200 text-red-700 animate-pulse' : 'bg-indigo-50 border-indigo-500 text-indigo-700 scale-105') :
+                   'bg-white border-slate-100 text-slate-700 hover:border-indigo-200'
+               }`}
+             >
+               {item.term}
+             </button>
+           ))}
+        </div>
+        <div className="space-y-2">
+           {shuffledDefs.map((defObj, i) => (
+             <button 
+               key={`def-${i}`}
+               disabled={matches.has(defObj.originalIndex)}
+               onClick={() => handleDefClick(defObj)}
+               className={`w-full p-3 rounded-xl text-left text-sm transition-all border-2 ${
+                   matches.has(defObj.originalIndex) ? 'bg-emerald-50 border-emerald-100 text-emerald-300 opacity-50 scale-95' :
+                   'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'
+               }`}
+             >
+               {defObj.def}
+             </button>
+           ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FlashcardBlock = ({ front, back }) => {
     const [flipped, setFlipped] = useState(false);
     return (
@@ -1508,7 +1598,7 @@ const LessonView = ({ lesson, onFinish }) => {
 };
 
 // --- FLASHCARD VIEW ---
-const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) => {
+const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride }) => {
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [manageMode, setManageMode] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -1518,7 +1608,8 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) 
   const [quickAddData, setQuickAddData] = useState({ front: '', back: '', type: 'noun' });
   const [gameMode, setGameMode] = useState('study'); // 'study', 'match', 'vocabjack'
   
-  const currentDeck = allDecks[selectedDeckKey];
+  // Correct logic to prioritize assigned deck via override
+  const currentDeck = activeDeckOverride || allDecks[selectedDeckKey];
   const cards = currentDeck?.cards || [];
   const card = cards[currentIndex];
   const theme = card ? (TYPE_COLORS[card.type] || TYPE_COLORS.noun) : TYPE_COLORS.noun;
@@ -1689,12 +1780,13 @@ const App = () => {
   const [classLessons, setClassLessons] = useState([]);
   const [activeStudentClass, setActiveStudentClass] = useState(null);
 
-  // Derived Data
+  // Derived Data: MERGE custom cards into system decks if they belong there, or keep them in 'custom'
   const allDecks = useMemo(() => {
     const decks = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
     customCards.forEach(card => {
         const target = card.deckId || 'custom';
         if (!decks[target]) {
+            // Create a new custom deck structure if it doesn't exist (for imported or new decks)
             decks[target] = { title: card.deckTitle || "Custom Deck", cards: [] };
         }
         if (!decks[target].cards) decks[target].cards = [];
@@ -1721,13 +1813,17 @@ const App = () => {
   useEffect(() => {
     if (!user) { setUserData(null); return; }
     
+    // Always load system decks first to ensure content is available
     setSystemDecks(INITIAL_SYSTEM_DECKS);
     setSystemLessons(INITIAL_SYSTEM_LESSONS);
 
     const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => { if (docSnap.exists()) setUserData(docSnap.data()); else setUserData(DEFAULT_USER_DATA); });
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => { const d = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); }); if (Object.keys(d).length > 0) setSystemDecks(d); });
+    const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => { const l = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (l.length > 0) setSystemLessons(l); });
     
+    // Enrolled Classes Listener
     const qEnrolled = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
     const unsubClasses = onSnapshot(qEnrolled, (snapshot) => {
         const cls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -1741,11 +1837,11 @@ const App = () => {
         setClassLessons(newAssignments);
         setUserData(prev => ({...prev, classAssignments: newAssignments}));
     }, (error) => {
-        console.log("Class sync error:", error);
+        console.log("Class sync error (likely needs index):", error);
         setUserData(prev => ({...prev, classSyncError: true}));
     });
 
-    return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubClasses(); };
+    return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); unsubClasses(); };
   }, [user]);
 
   // CRUD HANDLERS
@@ -1810,7 +1906,6 @@ const App = () => {
   if (!user) return <AuthView />;
   if (!userData) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>; 
   
-  // Using the unified logic, passing handlers down
   const commonHandlers = {
       onSaveCard: handleCreateCard,
       onUpdateCard: handleUpdateCard,
