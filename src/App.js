@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { 
@@ -74,7 +74,9 @@ import {
   Calendar,
   FileJson,
   AlertTriangle,
-  FlipVertical
+  FlipVertical,
+  Dice5,
+  GanttChart
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -207,6 +209,357 @@ const Header = ({ title, subtitle, rightAction, onClickTitle }) => (
   </div>
 );
 
+
+// --- GAME COMPONENTS ---
+
+const VocabJack = ({ deckCards, onGameEnd }) => {
+    const [gameState, setGameState] = useState({
+        userScore: 0,
+        dealerScore: 0,
+        cards: [],
+        question: null,
+        status: 'start', // 'start', 'ask', 'hit', 'stand', 'bust', 'win', 'lose'
+        isQuestionCorrect: null,
+        questionCard: null,
+        correctOption: null,
+    });
+    
+    // Memoize the deck questions for consistent multiple choice options
+    const gameQuestions = useMemo(() => {
+        return deckCards.map(card => {
+            const wrongCards = deckCards.filter(c => c.id !== card.id).sort(() => 0.5 - Math.random()).slice(0, 2);
+            const options = [
+                { id: 'a', text: card.back },
+                { id: 'b', text: wrongCards[0]?.back || 'N/A' },
+                { id: 'c', text: wrongCards[1]?.back || 'N/A' },
+            ].sort(() => 0.5 - Math.random());
+            
+            return {
+                card: card,
+                options: options,
+                correctId: options.find(o => o.text === card.back)?.id,
+                question: `What is the English definition of: ${card.front}?`,
+            };
+        }).filter(q => q.options.length === 3);
+    }, [deckCards]);
+
+    const getCardValue = (score) => {
+        let value = Math.floor(Math.random() * 8) + 2; // Value 2 through 9
+        if (score === 0) value = 11; // Ace on first draw for variety
+        return value;
+    };
+    
+    const startGame = useCallback(() => {
+        setGameState({
+            userScore: getCardValue(0),
+            dealerScore: getCardValue(0),
+            cards: [],
+            question: null,
+            status: 'hit', // Start ready to hit
+            isQuestionCorrect: null,
+            questionCard: null,
+            correctOption: null,
+        });
+    }, []);
+
+    const dealCard = useCallback((currentScore) => {
+        return getCardValue(currentScore);
+    }, []);
+
+    const askQuestion = useCallback(() => {
+        if (gameQuestions.length === 0) {
+            setGameState(prev => ({ ...prev, status: 'lose' }));
+            return;
+        }
+        const availableQuestions = gameQuestions.filter(q => 
+            !gameState.cards.some(c => c.questionId === q.card.id)
+        );
+        
+        const q = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
+        if (!q) {
+             setGameState(prev => ({ ...prev, status: 'lose' }));
+             return;
+        }
+        
+        setGameState(prev => ({
+            ...prev,
+            status: 'ask',
+            question: q.question,
+            questionCard: q.card,
+            correctOption: q.correctId,
+            questionOptions: q.options,
+        }));
+    }, [gameQuestions, gameState.cards]);
+
+    const submitAnswer = (selectedId) => {
+        const correct = selectedId === gameState.correctOption;
+        
+        if (correct) {
+            const newCardValue = dealCard(gameState.userScore);
+            const newScore = gameState.userScore + newCardValue;
+            
+            setGameState(prev => ({
+                ...prev,
+                userScore: newScore,
+                cards: [...prev.cards, { value: newCardValue, questionId: prev.questionCard.id }],
+                status: newScore > 21 ? 'bust' : 'hit',
+                isQuestionCorrect: true,
+            }));
+            
+            if (newScore > 21) {
+                setTimeout(() => setGameState(prev => ({ ...prev, status: 'lose' })), 1000);
+            }
+            
+        } else {
+            setGameState(prev => ({
+                ...prev,
+                status: 'stand', // Player loses turn
+                isQuestionCorrect: false,
+            }));
+            
+            setTimeout(() => {
+                 alert(`Wrong answer! The correct answer was: ${gameState.questionOptions.find(o => o.id === gameState.correctOption).text}`);
+                 dealDealerCard();
+            }, 800);
+        }
+    };
+
+    const dealDealerCard = () => {
+        let currentDealerScore = gameState.dealerScore;
+        
+        while (currentDealerScore < 17) {
+            currentDealerScore += dealCard(currentDealerScore);
+        }
+        
+        setGameState(prev => {
+            const finalStatus = currentDealerScore > 21 ? 'win' : 
+                                currentDealerScore >= prev.userScore ? 'lose' : 'win';
+                                
+            onGameEnd(finalStatus === 'win' ? 50 : -10);
+
+            return {
+                ...prev,
+                dealerScore: currentDealerScore,
+                status: finalStatus,
+            };
+        });
+    };
+
+    const handleStand = () => {
+        setGameState(prev => ({ ...prev, status: 'stand' }));
+        dealDealerCard();
+    };
+    
+    // Auto trigger question when ready to hit
+    useEffect(() => {
+        if (gameState.status === 'hit' && deckCards.length >= 3) {
+            askQuestion();
+        }
+    }, [gameState.status, askQuestion, deckCards.length]);
+
+    if (deckCards.length < 3) {
+        return <div className="p-6 text-center text-slate-500"><AlertTriangle size={24} className="mx-auto text-amber-500 mb-2" /><p>Need at least 3 cards in this deck to play VocabJack!</p></div>;
+    }
+
+    return (
+        <div className="p-6 space-y-6 bg-slate-100 rounded-2xl">
+            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Dice5 size={24} className="text-indigo-600" /> VocabJack</h3>
+
+            <div className="grid grid-cols-2 gap-4 text-center font-bold">
+                <div className={`p-4 rounded-xl border-2 ${gameState.status === 'win' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-300 bg-white'}`}>
+                    <p className="text-xs text-slate-500 uppercase">Dealer (Magister)</p>
+                    <p className="text-3xl text-slate-900 mt-2">{gameState.dealerScore}</p>
+                </div>
+                <div className={`p-4 rounded-xl border-2 ${gameState.status === 'win' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-300 bg-white'}`}>
+                    <p className="text-xs text-slate-500 uppercase">You (Discipulus)</p>
+                    <p className={`text-3xl mt-2 ${gameState.userScore > 21 ? 'text-red-600' : 'text-indigo-600'}`}>
+                        {gameState.userScore}
+                    </p>
+                    <div className="flex justify-center gap-1 mt-2">
+                        {gameState.cards.map((c, i) => (
+                             <span key={i} className="text-xs bg-indigo-200 text-indigo-800 px-1 rounded font-mono">{c.value}</span>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Status and Action Area */}
+            <div className="text-center space-y-4">
+                {['win', 'lose', 'bust'].includes(gameState.status) ? (
+                    <div className={`p-4 rounded-xl font-bold text-lg ${gameState.status === 'win' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                        {gameState.status === 'win' && 'VICTORIA! You won 50 XP!'}
+                        {gameState.status === 'lose' && 'PERDISTI! Dealer wins.'}
+                        {gameState.status === 'bust' && 'BUST! You lost.'}
+                    </div>
+                ) : gameState.status === 'ask' && gameState.questionCard ? (
+                    <div className="bg-white p-4 rounded-xl border border-indigo-200 shadow-lg space-y-3">
+                        <p className="text-sm text-slate-600">{gameState.question}</p>
+                        {gameState.questionOptions.map(option => (
+                            <button 
+                                key={option.id}
+                                onClick={() => submitAnswer(option.id)}
+                                className="w-full p-3 rounded-lg border text-sm font-bold bg-slate-50 hover:bg-slate-100"
+                                disabled={gameState.isQuestionCorrect !== null}
+                            >
+                                {option.text}
+                            </button>
+                        ))}
+                         {gameState.isQuestionCorrect !== null && (
+                            <div className={`text-sm font-bold ${gameState.isQuestionCorrect ? 'text-emerald-600' : 'text-red-600'}`}>
+                                {gameState.isQuestionCorrect ? 'Correct! Drawing card...' : 'Incorrect! Losing turn...'}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <p className="text-sm text-slate-500">Answer correctly to hit, or stand when ready.</p>
+                )}
+            </div>
+
+            <div className="flex gap-4">
+                {gameState.status !== 'ask' && !['win', 'lose', 'bust'].includes(gameState.status) && (
+                    <>
+                        <button 
+                            onClick={handleStand}
+                            className="flex-1 bg-amber-600 text-white p-3 rounded-xl font-bold shadow-md hover:bg-amber-700 disabled:opacity-50"
+                            disabled={gameState.userScore === 0}
+                        >
+                            STAND
+                        </button>
+                    </>
+                )}
+                {['win', 'lose', 'bust', 'start'].includes(gameState.status) && (
+                    <button 
+                        onClick={startGame}
+                        className="w-full bg-indigo-600 text-white p-3 rounded-xl font-bold shadow-md hover:bg-indigo-700"
+                    >
+                        {gameState.status === 'start' ? 'Start Game' : 'Play Again'}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const MatchingGame = ({ deckCards, onGameEnd }) => {
+    const [cards, setCards] = useState([]);
+    const [flippedIndices, setFlippedIndices] = useState([]);
+    const [matchedIndices, setMatchedIndices] = useState([]);
+    const [isChecking, setIsChecking] = useState(false);
+    
+    // Prepare the cards
+    useEffect(() => {
+        if (deckCards.length < 6) return; // Need at least 6 cards for a 4x3 grid (12 cards total)
+
+        const gameItems = deckCards.slice(0, 6).flatMap((card, index) => [
+            { id: `term-${index}`, content: card.front, matchId: index, isTerm: true, key: `t-${index}` },
+            { id: `def-${index}`, content: card.back, matchId: index, isTerm: false, key: `d-${index}` }
+        ]);
+
+        // Fisher-Yates shuffle
+        for (let i = gameItems.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [gameItems[i], gameItems[j]] = [gameItems[j], gameItems[i]];
+        }
+
+        setCards(gameItems);
+        setFlippedIndices([]);
+        setMatchedIndices([]);
+        setIsChecking(false);
+    }, [deckCards]);
+
+    const handleCardClick = (index) => {
+        if (isChecking || matchedIndices.includes(index) || flippedIndices.includes(index)) {
+            return;
+        }
+
+        const newFlipped = [...flippedIndices, index];
+        setFlippedIndices(newFlipped);
+
+        if (newFlipped.length === 2) {
+            setIsChecking(true);
+            const [firstIndex, secondIndex] = newFlipped;
+            const firstCard = cards[firstIndex];
+            const secondCard = cards[secondIndex];
+
+            if (firstCard.matchId === secondCard.matchId) {
+                // Match found
+                setMatchedIndices([...matchedIndices, firstIndex, secondIndex]);
+                setFlippedIndices([]);
+                setIsChecking(false);
+                if (matchedIndices.length + 2 === cards.length) {
+                    onGameEnd(100);
+                }
+            } else {
+                // No match
+                setTimeout(() => {
+                    setFlippedIndices([]);
+                    setIsChecking(false);
+                }, 1000);
+            }
+        }
+    };
+    
+    if (deckCards.length < 6) {
+        return <div className="p-6 text-center text-slate-500"><AlertTriangle size={24} className="mx-auto text-amber-500 mb-2" /><p>Need at least 6 cards in this deck for the Matching Game!</p></div>;
+    }
+
+    return (
+        <div className="p-6 space-y-4 bg-slate-100 rounded-2xl">
+            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><GanttChart size={24} className="text-indigo-600" /> Matching Game</h3>
+
+            <div className="grid grid-cols-4 grid-rows-3 gap-3 w-full max-w-sm mx-auto">
+                {cards.map((card, index) => {
+                    const isFlippedOrMatched = flippedIndices.includes(index) || matchedIndices.includes(index);
+                    const isMatched = matchedIndices.includes(index);
+                    
+                    return (
+                        <div 
+                            key={card.key} 
+                            onClick={() => handleCardClick(index)}
+                            className={`h-20 p-2 rounded-xl text-center flex items-center justify-center transition-all duration-300 transform perspective-1000 cursor-pointer ${isMatched ? 'scale-95 opacity-50' : 'shadow-md hover:scale-[1.03]'}`}
+                            style={{ opacity: isMatched ? 0.4 : 1, transform: isFlippedOrMatched ? 'rotateY(0deg)' : 'rotateY(180deg)' }}
+                        >
+                            <div className={`absolute inset-0 backface-hidden rounded-xl flex items-center justify-center p-2 text-sm font-bold transition-transform ${isFlippedOrMatched ? 'bg-white text-slate-800' : 'bg-indigo-600 text-white rotate-y-180'}`}>
+                                {isFlippedOrMatched ? (
+                                    <span className={card.isTerm ? 'font-serif' : 'font-sans text-slate-600 text-xs'}>
+                                        {card.content}
+                                    </span>
+                                ) : (
+                                    <span className="text-xl font-black">?</span>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+            
+            {matchedIndices.length === cards.length && cards.length > 0 && (
+                <div className="p-4 bg-emerald-50 text-emerald-800 font-bold text-center rounded-xl animate-in zoom-in">
+                    VICTORIA! All Matched. +100 XP!
+                </div>
+            )}
+        </div>
+    );
+};
+
+
+const VocabGames = ({ deckCards, onGameEnd }) => {
+    const [gameMode, setGameMode] = useState('match'); // 'match', 'vocabjack'
+
+    return (
+        <div className="space-y-4">
+             <div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-md mx-auto">
+                 <button onClick={() => setGameMode('match')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${gameMode === 'match' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Matching Game</button>
+                 <button onClick={() => setGameMode('vocabjack')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${gameMode === 'vocabjack' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>VocabJack</button>
+            </div>
+
+            {gameMode === 'match' && <MatchingGame deckCards={deckCards} onGameEnd={onGameEnd} />}
+            {gameMode === 'vocabjack' && <VocabJack deckCards={deckCards} onGameEnd={onGameEnd} />}
+        </div>
+    );
+};
+
+
 // --- SPECIAL LESSON COMPONENTS ---
 
 const VocabMatchBlock = ({ items }) => {
@@ -247,13 +600,13 @@ const VocabMatchBlock = ({ items }) => {
   };
 
   if (matches.size === items.length && items.length > 0) {
-     return (
-         <div className="bg-emerald-50 p-8 rounded-3xl text-center border border-emerald-100 animate-in zoom-in">
-             <Check size={48} className="mx-auto text-emerald-500 mb-4"/>
-             <h3 className="text-xl font-bold text-emerald-900">Perfect Match!</h3>
-             <p className="text-emerald-700 text-sm mt-1">You've mastered these terms.</p>
-         </div>
-     )
+      return (
+          <div className="bg-emerald-50 p-8 rounded-3xl text-center border border-emerald-100 animate-in zoom-in">
+              <Check size={48} className="mx-auto text-emerald-500 mb-4"/>
+              <h3 className="text-xl font-bold text-emerald-900">Perfect Match!</h3>
+              <p className="text-emerald-700 text-sm mt-1">You've mastered these terms.</p>
+          </div>
+      )
   }
 
   return (
@@ -264,14 +617,14 @@ const VocabMatchBlock = ({ items }) => {
         <div className="space-y-2">
            {items.map((item, i) => (
              <button 
-                key={`term-${i}`} 
-                disabled={matches.has(i)}
-                onClick={() => handleTermClick(i)}
-                className={`w-full p-3 rounded-xl text-left text-sm font-bold transition-all border-2 ${
-                    matches.has(i) ? 'bg-emerald-50 border-emerald-100 text-emerald-300 opacity-50 scale-95' :
-                    selectedTerm === i ? (isCorrect === false ? 'bg-red-50 border-red-200 text-red-700 animate-pulse' : 'bg-indigo-50 border-indigo-500 text-indigo-700 scale-105') :
-                    'bg-white border-slate-100 text-slate-700 hover:border-indigo-200'
-                }`}
+               key={`term-${i}`} 
+               disabled={matches.has(i)}
+               onClick={() => handleTermClick(i)}
+               className={`w-full p-3 rounded-xl text-left text-sm font-bold transition-all border-2 ${
+                   matches.has(i) ? 'bg-emerald-50 border-emerald-100 text-emerald-300 opacity-50 scale-95' :
+                   selectedTerm === i ? (isCorrect === false ? 'bg-red-50 border-red-200 text-red-700 animate-pulse' : 'bg-indigo-50 border-indigo-500 text-indigo-700 scale-105') :
+                   'bg-white border-slate-100 text-slate-700 hover:border-indigo-200'
+               }`}
              >
                {item.term}
              </button>
@@ -280,13 +633,13 @@ const VocabMatchBlock = ({ items }) => {
         <div className="space-y-2">
            {shuffledDefs.map((defObj, i) => (
              <button 
-                key={`def-${i}`}
-                disabled={matches.has(defObj.originalIndex)}
-                onClick={() => handleDefClick(defObj)}
-                className={`w-full p-3 rounded-xl text-left text-sm transition-all border-2 ${
-                    matches.has(defObj.originalIndex) ? 'bg-emerald-50 border-emerald-100 text-emerald-300 opacity-50 scale-95' :
-                    'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'
-                }`}
+               key={`def-${i}`}
+               disabled={matches.has(defObj.originalIndex)}
+               onClick={() => handleDefClick(defObj)}
+               className={`w-full p-3 rounded-xl text-left text-sm transition-all border-2 ${
+                   matches.has(defObj.originalIndex) ? 'bg-emerald-50 border-emerald-100 text-emerald-300 opacity-50 scale-95' :
+                   'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'
+               }`}
              >
                {defObj.def}
              </button>
@@ -368,7 +721,7 @@ const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
       sentence: card.usage?.sentence || '',
       sentenceTrans: card.usage?.translation || '',
       grammarTags: card.grammar_tags?.join(', ') || '',
-      deckId: formData.deckId 
+      deckId: card.deckId || formData.deckId
     });
     setMorphology(card.morphology || []);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -422,9 +775,23 @@ const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
     }
   };
 
-  const deckOptions = availableDecks ? Object.entries(availableDecks).map(([key, deck]) => ({ id: key, title: deck.title })) : [];
+  // Ensure availableDecks is an object before iterating
+  const validDecks = availableDecks || {};
+  const deckOptions = Object.entries(validDecks).map(([key, deck]) => ({ id: key, title: deck.title }));
   
-  const currentDeckCards = availableDecks && availableDecks[formData.deckId] ? availableDecks[formData.deckId].cards : [];
+  const currentDeckCards = validDecks[formData.deckId] ? validDecks[formData.deckId].cards || [] : 
+                          validDecks['custom'] ? validDecks['custom'].cards || [] : [];
+                          
+  // Filter out system decks from card list view in the builder
+  const deletableCards = currentDeckCards.filter(card => !INITIAL_SYSTEM_DECKS[formData.deckId]);
+  
+  // If the card being edited is deleted (e.g. successful update/delete), clear editing state
+  useEffect(() => {
+    if (editingId && !currentDeckCards.some(c => c.id === editingId)) {
+        handleClear();
+    }
+  }, [currentDeckCards, editingId]);
+
 
   return (
     <div className="px-6 mt-4 space-y-6 pb-20 relative">
@@ -460,8 +827,8 @@ const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
             )}
         </div>
         <div className="grid grid-cols-2 gap-4">
-           <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Latin Word</label><input name="front" value={formData.front} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="e.g. Bellum" /></div>
-           <div className="space-y-2"><label className="text-xs font-bold text-slate-400">English</label><input name="back" value={formData.back} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="e.g. War" /></div>
+            <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Latin Word</label><input name="front" value={formData.front} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="e.g. Bellum" /></div>
+            <div className="space-y-2"><label className="text-xs font-bold text-slate-400">English</label><input name="back" value={formData.back} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="e.g. War" /></div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Part of Speech</label><select name="type" value={formData.type} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-white"><option value="noun">Noun</option><option value="verb">Verb</option><option value="adjective">Adjective</option><option value="adverb">Adverb</option><option value="phrase">Phrase</option></select></div>
@@ -472,17 +839,17 @@ const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
       <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
         <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Morphology (X-Ray Data)</h3>
         <div className="flex gap-2 items-end">
-           <div className="flex-1 space-y-1"><label className="text-[10px] font-bold text-slate-400">Part</label><input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="Bell-" /></div>
-           <div className="flex-1 space-y-1"><label className="text-[10px] font-bold text-slate-400">Meaning</label><input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="War" /></div>
-           <div className="w-24 space-y-1">
-             <label className="text-[10px] font-bold text-slate-400">Type</label>
-             <select value={newMorphPart.type} onChange={(e) => setNewMorphPart({...newMorphPart, type: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm bg-white">
-               <option value="root">Root</option>
-               <option value="prefix">Prefix</option>
-               <option value="suffix">Suffix</option>
-             </select>
-           </div>
-           <button type="button" onClick={addMorphology} className="bg-indigo-100 text-indigo-600 p-2 rounded-lg hover:bg-indigo-200"><Plus size={20}/></button>
+            <div className="flex-1 space-y-1"><label className="text-[10px] font-bold text-slate-400">Part</label><input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="Bell-" /></div>
+            <div className="flex-1 space-y-1"><label className="text-[10px] font-bold text-slate-400">Meaning</label><input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="War" /></div>
+            <div className="w-24 space-y-1">
+              <label className="text-[10px] font-bold text-slate-400">Type</label>
+              <select value={newMorphPart.type} onChange={(e) => setNewMorphPart({...newMorphPart, type: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm bg-white">
+                <option value="root">Root</option>
+                <option value="prefix">Prefix</option>
+                <option value="suffix">Suffix</option>
+              </select>
+            </div>
+            <button type="button" onClick={addMorphology} className="bg-indigo-100 text-indigo-600 p-2 rounded-lg hover:bg-indigo-200"><Plus size={20}/></button>
         </div>
         <div className="flex flex-wrap gap-2 mt-2">{morphology.map((m, i) => (<div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full text-sm"><span className="font-bold text-indigo-700">{m.part}</span><span className="text-slate-500 text-xs">({m.meaning})</span><button type="button" onClick={() => removeMorphology(i)} className="text-slate-300 hover:text-rose-500"><X size={14}/></button></div>))}</div>
       </section>
@@ -511,8 +878,11 @@ const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
                             <span className="text-sm text-slate-500">{card.back}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                           <Edit3 size={16} className="text-indigo-400" />
-                           <button onClick={(e) => { e.stopPropagation(); onDeleteCard(card.id); }} className="p-1 text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>
+                            <Edit3 size={16} className="text-indigo-400" />
+                            {/* Only allow deletion of non-system cards */}
+                            {!INITIAL_SYSTEM_DECKS[card.deckId] && (
+                                <button onClick={(e) => { e.stopPropagation(); onDeleteCard(card.id); }} className="p-1 text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -526,7 +896,12 @@ const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
 const LessonBuilderView = ({ data, setData, onSave, availableDecks }) => {
   const [toastMsg, setToastMsg] = useState(null);
   const updateBlock = (index, field, value) => { const newBlocks = [...(data.blocks || [])]; newBlocks[index] = { ...newBlocks[index], [field]: value }; setData({ ...data, blocks: newBlocks }); };
-  const updateDialogueLine = (blockIndex, lineIndex, field, value) => { const newBlocks = [...(data.blocks || [])]; newBlocks[blockIndex].lines[lineIndex][field] = value; setData({ ...data, blocks: newBlocks }); };
+  const updateDialogueLine = (blockIndex, lineIndex, field, value) => { 
+      const newBlocks = [...(data.blocks || [])]; 
+      if (!newBlocks[blockIndex].lines[lineIndex]) newBlocks[blockIndex].lines.push({}); 
+      newBlocks[blockIndex].lines[lineIndex] = { ...newBlocks[blockIndex].lines[lineIndex], [field]: value }; 
+      setData({ ...data, blocks: newBlocks }); 
+  };
   const updateVocabItem = (blockIndex, itemIndex, field, value) => { const newBlocks = [...(data.blocks || [])]; newBlocks[blockIndex].items[itemIndex][field] = value; setData({ ...data, blocks: newBlocks }); };
   
   const addBlock = (type) => { 
@@ -534,7 +909,7 @@ const LessonBuilderView = ({ data, setData, onSave, availableDecks }) => {
       : type === 'quiz' ? { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' } 
       : type === 'vocab-list' ? { type: 'vocab-list', items: [{ term: '', definition: '' }] }
       : type === 'flashcard' ? { type: 'flashcard', front: '', back: '' }
-      : type === 'image' ? { type: 'image', url: '', caption: '' }
+      : type === 'image' ? { type: 'image', url: 'https://placehold.co/400x200/slate/white?text=Placeholder', caption: '' }
       : type === 'note' ? { type: 'note', title: '', content: '' }
       : { type: 'text', title: '', content: '' }; // text
     setData({ ...data, blocks: [...(data.blocks || []), baseBlock] }); 
@@ -545,7 +920,7 @@ const LessonBuilderView = ({ data, setData, onSave, availableDecks }) => {
   const handleSave = () => { 
     if (!data.title) return alert("Title required"); 
     const processedVocab = Array.isArray(data.vocab) ? data.vocab : (typeof data.vocab === 'string' ? data.vocab.split(',').map(s => s.trim()) : []);
-    onSave({ ...data, vocab: processedVocab, xp: 100 }); 
+    onSave({ ...data, vocab: processedVocab, xp: data.xp || 100 }); 
     setToastMsg("Lesson Saved Successfully");
   };
 
@@ -582,7 +957,7 @@ const LessonBuilderView = ({ data, setData, onSave, availableDecks }) => {
             
             {block.type === 'note' && (<div className="space-y-3 mt-4"><div className="flex gap-2"><Info size={18} className="text-amber-500"/><input className="flex-1 p-2 border-b border-slate-100 font-bold text-sm focus:outline-none" placeholder="Note Title (e.g. Grammar Tip)" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} /></div><textarea className="w-full p-2 bg-amber-50 border border-amber-100 rounded-lg text-sm min-h-[80px] text-amber-800" placeholder="Tip content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} /></div>)}
 
-            {block.type === 'image' && (<div className="space-y-3 mt-4"><div className="flex gap-2 items-center"><Image size={18} className="text-slate-400"/><input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Image URL" value={block.url} onChange={e => updateBlock(idx, 'url', e.target.value)} /></div><input className="w-full p-2 bg-slate-50 rounded-lg text-sm" placeholder="Caption" value={block.caption} onChange={e => updateBlock(idx, 'caption', e.target.value)} /></div>)}
+            {block.type === 'image' && (<div className="space-y-3 mt-4"><div className="flex gap-2 items-center"><Image size={18} className="text-slate-400"/><input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Image URL (e.g., https://placehold.co/400x200)" value={block.url} onChange={e => updateBlock(idx, 'url', e.target.value)} /></div><input className="w-full p-2 bg-slate-50 rounded-lg text-sm" placeholder="Caption" value={block.caption} onChange={e => updateBlock(idx, 'caption', e.target.value)} /></div>)}
 
             {block.type === 'vocab-list' && (<div className="space-y-3 mt-6"><p className="text-xs font-bold text-slate-400 uppercase">Vocabulary List</p>{block.items.map((item, i) => (<div key={i} className="flex gap-2"><input className="flex-1 p-2 bg-slate-50 rounded border border-slate-100 text-sm font-bold" placeholder="Term" value={item.term} onChange={e => updateVocabItem(idx, i, 'term', e.target.value)} /><input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Definition" value={item.definition} onChange={e => updateVocabItem(idx, i, 'definition', e.target.value)} /></div>))}<button onClick={() => { const newItems = [...block.items, { term: '', definition: '' }]; updateBlock(idx, 'items', newItems); }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Add Term</button></div>)}
 
@@ -696,6 +1071,7 @@ const ClassManagerView = ({ user, lessons, allDecks }) => {
         // If deck, ensure we have title and cards. If lesson, ensure we have content.
         const assignment = JSON.parse(JSON.stringify({
              ...item,
+             id: item.id || `assign_${Date.now()}`,
              contentType: type // 'lesson' or 'deck'
         }));
 
@@ -722,24 +1098,24 @@ const ClassManagerView = ({ user, lessons, allDecks }) => {
           </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-           <div className="space-y-4">
-             <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
-             {(!selectedClass.assignments || selectedClass.assignments.length === 0) && <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm">No content assigned yet.</div>}
-             {selectedClass.assignments?.map((l, idx) => (
-                 <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+            <div className="space-y-4">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
+              {(!selectedClass.assignments || selectedClass.assignments.length === 0) && <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm">No content assigned yet.</div>}
+              {selectedClass.assignments?.map((l, idx) => (
+                  <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
                     <div>
                         <h4 className="font-bold text-slate-800">{l.title}</h4>
                         <span className="text-[10px] text-slate-500 uppercase">{l.contentType || 'Lesson'}</span>
                     </div>
                     <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-xs font-bold">Active</span>
-                 </div>
-             ))}
-           </div>
-           <div className="space-y-4">
-             <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Roster</h3>
-             <form onSubmit={addStudent} className="flex gap-2"><input value={newStudentEmail} onChange={e => setNewStudentEmail(e.target.value)} placeholder="Student Email" className="flex-1 p-2 rounded-lg border border-slate-200 text-sm" /><button type="submit" className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2 rounded-lg"><Plus size={18}/></button></form>
-             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">{(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}{selectedClass.students?.map((s, i) => (<div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center gap-3"><div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0)}</div><span className="text-sm font-medium text-slate-700">{s}</span></div>))}</div>
-           </div>
+                  </div>
+              ))}
+            </div>
+            <div className="space-y-4">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Roster</h3>
+              <form onSubmit={addStudent} className="flex gap-2"><input value={newStudentEmail} onChange={e => setNewStudentEmail(e.target.value)} placeholder="Student Email" className="flex-1 p-2 rounded-lg border border-slate-200 text-sm" /><button type="submit" className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2 rounded-lg"><Plus size={18}/></button></form>
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">{(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}{selectedClass.students?.map((s, i) => (<div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center gap-3"><div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0)}</div><span className="text-sm font-medium text-slate-700">{s}</span></div>))}</div>
+            </div>
         </div>
         {assignModalOpen && (
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -835,13 +1211,13 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
               } 
               // Case 2: It's a Lesson (has 'blocks' or 'dialogue')
               else if (item.blocks || item.dialogue) {
-                   const ref = doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id);
-                   batch.set(ref, {
-                       ...item,
-                       vocab: Array.isArray(item.vocab) ? item.vocab : [],
-                       xp: item.xp || 100
-                   });
-                   count++;
+                  const ref = doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id);
+                  batch.set(ref, {
+                      ...item,
+                      vocab: Array.isArray(item.vocab) ? item.vocab : [],
+                      xp: item.xp || 100
+                  });
+                  count++;
               }
           });
           
@@ -875,13 +1251,13 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
   };
   
   const handleEditDeck = (deckId) => {
+      setEditingId(deckId);
       setBuilderMode('deck');
       setView('builder'); 
   };
 
-
   const NavItem = ({ id, icon: Icon, label }) => (
-    <button onClick={() => setView(id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${view === id ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
+    <button onClick={() => { setView(id); setEditingId(null); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${view === id ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
       <Icon size={20} /><span>{label}</span>
     </button>
   );
@@ -896,9 +1272,9 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
   // Widget logic
   const activeStudents = 24; // Placeholder for now
   const recentActivity = [
-     { text: "Marcus finished 'Salutationes'", time: "2m", color: "bg-emerald-500" },
-     { text: "Julia joined 'Latin 101'", time: "15m", color: "bg-blue-500" },
-     { text: "New deck created", time: "1h", color: "bg-amber-500" },
+      { text: "Marcus finished 'Salutationes'", time: "2m", color: "bg-emerald-500" },
+      { text: "Julia joined 'Latin 101'", time: "15m", color: "bg-blue-500" },
+      { text: "New deck created", time: "1h", color: "bg-amber-500" },
   ];
 
   // Quick Actions
@@ -917,17 +1293,17 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
         
         {/* Admin Import Zone in Sidebar for easy access */}
         <div className="pt-6 border-t border-slate-100">
-           <div className="mb-4 px-2">
-             <div className="flex justify-between items-center mb-2">
-                <h4 className="text-xs font-bold text-slate-400 uppercase">AI Import</h4>
-                <div className="flex bg-slate-100 rounded p-0.5">
-                    <button onClick={() => setImportMode('lesson')} className={`px-2 py-0.5 text-[10px] rounded ${importMode === 'lesson' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}>Lesson</button>
-                    <button onClick={() => setImportMode('deck')} className={`px-2 py-0.5 text-[10px] rounded ${importMode === 'deck' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}>Deck</button>
-                </div>
-             </div>
-             <textarea value={jsonInput} onChange={e => setJsonInput(e.target.value)} className="w-full p-2 text-xs border rounded bg-slate-50 mb-2 font-mono" placeholder={importMode === 'lesson' ? '[{"title": "...", "blocks": [...]}]' : '[{"title": "My Deck", "cards": [{"front": "...", "back": "..."}]}]'} rows={3}></textarea>
-             <button onClick={handleBulkImport} disabled={!jsonInput} className="w-full bg-slate-800 text-white text-xs py-1 rounded disabled:opacity-50 flex items-center justify-center gap-1"><FileJson size={12}/> Import {importMode === 'lesson' ? 'Lessons' : 'Decks'}</button>
-           </div>
+            <div className="mb-4 px-2">
+              <div className="flex justify-between items-center mb-2">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase">AI Import</h4>
+                  <div className="flex bg-slate-100 rounded p-0.5">
+                      <button onClick={() => setImportMode('lesson')} className={`px-2 py-0.5 text-[10px] rounded ${importMode === 'lesson' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}>Lesson</button>
+                      <button onClick={() => setImportMode('deck')} className={`px-2 py-0.5 text-[10px] rounded ${importMode === 'deck' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}>Deck</button>
+                  </div>
+              </div>
+              <textarea value={jsonInput} onChange={e => setJsonInput(e.target.value)} className="w-full p-2 text-xs border rounded bg-slate-50 mb-2 font-mono" placeholder={importMode === 'lesson' ? '[{"title": "...", "blocks": [...]}]' : '[{"title": "My Deck", "cards": [{"front": "...", "back": "..."}]}]'} rows={3}></textarea>
+              <button onClick={handleBulkImport} disabled={!jsonInput} className="w-full bg-slate-800 text-white text-xs py-1 rounded disabled:opacity-50 flex items-center justify-center gap-1"><FileJson size={12}/> Import {importMode === 'lesson' ? 'Lessons' : 'Decks'}</button>
+            </div>
           <div className="flex items-center gap-3 px-2 mb-4">
             <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs">{userData?.name?.charAt(0)}</div>
             <div className="flex-1 overflow-hidden"><p className="text-sm font-bold truncate">{userData?.name}</p><p className="text-xs text-slate-400 truncate">{user.email}</p></div>
@@ -942,7 +1318,7 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
                <h2 className="text-2xl font-bold text-slate-800">Dashboard</h2>
                <span className="text-sm text-slate-500">{new Date().toLocaleDateString()}</span>
             </div>
-       
+        
             {/* Top Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -964,73 +1340,73 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
                   </div>
                 </div>
             </div>
-       
+        
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-               
-               {/* Left Column (2/3) */}
-               <div className="lg:col-span-2 space-y-6">
-                   
-                   {/* Quick Actions */}
-                   <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                       <h3 className="font-bold text-slate-800 mb-4">Quick Actions</h3>
-                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                           {quickAction("New Class", <Plus size={20}/>, () => setView('classes'))}
-                           {quickAction("New Lesson", <FileText size={20}/>, () => { setBuilderMode('lesson'); setView('builder'); })}
-                           {quickAction("New Deck", <Layers size={20}/>, () => { setBuilderMode('deck'); setView('builder'); })}
-                           {quickAction("Browse Lib", <Library size={20}/>, () => setView('library'))}
-                       </div>
-                   </div>
-       
-                   {/* Class Performance (Mock/Derived) */}
-                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                       <h3 className="font-bold text-slate-800 mb-4 flex items-center justify-between">
-                           <span>Class Engagement</span>
-                           <span className="text-xs font-normal text-slate-400">Students per Class</span>
-                       </h3>
-                       <div className="space-y-4">
-                           {/* Mock classes since we don't have classes prop here directly, need to fetch inside or pass down */}
-                           <div className="p-4 text-center text-slate-400 text-sm italic">No active class data available for chart.</div>
-                       </div>
+                
+                {/* Left Column (2/3) */}
+                <div className="lg:col-span-2 space-y-6">
+                    
+                    {/* Quick Actions */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <h3 className="font-bold text-slate-800 mb-4">Quick Actions</h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {quickAction("New Class", <Plus size={20}/>, () => setView('classes'))}
+                            {quickAction("New Lesson", <FileText size={20}/>, () => { setBuilderMode('lesson'); setView('builder'); })}
+                            {quickAction("New Deck", <Layers size={20}/>, () => { setBuilderMode('deck'); setView('builder'); })}
+                            {quickAction("Browse Lib", <Library size={20}/>, () => setView('library'))}
+                        </div>
                     </div>
-       
-               </div>
-       
-               {/* Right Column (1/3) */}
-               <div className="space-y-6">
+        
+                    {/* Class Performance (Mock/Derived) */}
+                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <h3 className="font-bold text-slate-800 mb-4 flex items-center justify-between">
+                            <span>Class Engagement</span>
+                            <span className="text-xs font-normal text-slate-400">Students per Class</span>
+                        </h3>
+                        <div className="space-y-4">
+                            {/* Mock classes since we don't have classes prop here directly, need to fetch inside or pass down */}
+                            <div className="p-4 text-center text-slate-400 text-sm italic">No active class data available for chart.</div>
+                        </div>
+                    </div>
+        
+                </div>
+        
+                {/* Right Column (1/3) */}
+                <div className="space-y-6">
                     {/* Recent Activity (Mock) */}
                     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-full">
-                       <h3 className="font-bold text-slate-800 mb-4">Live Feed</h3>
-                       <div className="space-y-0 relative">
-                           <div className="absolute left-3 top-2 bottom-2 w-0.5 bg-slate-100"></div>
-                           {recentActivity.map((item, i) => (
-                               <div key={i} className="flex gap-3 mb-6 relative z-10">
-                                   <div className={`w-6 h-6 rounded-full border-2 border-white shadow-sm flex-shrink-0 ${item.color}`}></div>
-                                   <div>
-                                       <p className="text-sm font-medium text-slate-700 leading-none">{item.text}</p>
-                                       <p className="text-xs text-slate-400 mt-1">{item.time} ago</p>
-                                   </div>
-                               </div>
-                           ))}
-                       </div>
-                       <button className="w-full py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 rounded-lg mt-2">View All Activity</button>
+                        <h3 className="font-bold text-slate-800 mb-4">Live Feed</h3>
+                        <div className="space-y-0 relative">
+                            <div className="absolute left-3 top-2 bottom-2 w-0.5 bg-slate-100"></div>
+                            {recentActivity.map((item, i) => (
+                                <div key={i} className="flex gap-3 mb-6 relative z-10">
+                                    <div className={`w-6 h-6 rounded-full border-2 border-white shadow-sm flex-shrink-0 ${item.color}`}></div>
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-700 leading-none">{item.text}</p>
+                                        <p className="text-xs text-slate-400 mt-1">{item.time} ago</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <button className="w-full py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 rounded-lg mt-2">View All Activity</button>
                     </div>
-               </div>
-       
+                </div>
+        
             </div>
           </div>
         )}
         {view === 'classes' && <ClassManagerView user={user} lessons={[...INITIAL_SYSTEM_LESSONS, ...lessons]} allDecks={allDecks} />}
         {view === 'library' && (
-           <div className="space-y-8 animate-in fade-in duration-500">
-             <div><h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3><div className="grid grid-cols-1 md:grid-cols-3 gap-4">{[...INITIAL_SYSTEM_LESSONS, ...lessons].map(l => (<div key={l.id} onClick={() => handleEditLesson(l)} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-indigo-300 cursor-pointer transition-colors"><div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600"><PlayCircle size={20}/></div><div><h4 className="font-bold text-slate-900">{l.title}</h4><p className="text-xs text-slate-500">{l.vocab.length} Words</p></div><div className="ml-auto"><Pencil size={16} className="text-slate-300"/></div></div>))}</div></div>
-             <div><h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><Layers size={18} className="text-orange-500"/> Decks</h3><div className="grid grid-cols-1 md:grid-cols-4 gap-4">{Object.entries(allDecks).map(([key, deck]) => (<div key={key} onClick={() => handleEditDeck(key)} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-orange-300 cursor-pointer transition-colors"><div className="flex justify-between"><h4 className="font-bold text-slate-900">{deck.title}</h4><PlusCircle size={16} className="text-slate-300"/></div><p className="text-xs text-slate-500">{deck.cards?.length} Cards</p></div>))}</div></div>
-           </div>
+            <div className="space-y-8 animate-in fade-in duration-500">
+              <div><h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3><div className="grid grid-cols-1 md:grid-cols-3 gap-4">{[...INITIAL_SYSTEM_LESSONS, ...lessons].map(l => (<div key={l.id} onClick={() => handleEditLesson(l)} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-indigo-300 cursor-pointer transition-colors"><div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600"><PlayCircle size={20}/></div><div><h4 className="font-bold text-slate-900">{l.title}</h4><p className="text-xs text-slate-500">{l.vocab.length} Words</p></div><div className="ml-auto"><Pencil size={16} className="text-slate-300"/></div></div>))}</div></div>
+              <div><h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><Layers size={18} className="text-orange-500"/> Decks</h3><div className="grid grid-cols-1 md:grid-cols-4 gap-4">{Object.entries(allDecks).map(([key, deck]) => (<div key={key} onClick={() => handleEditDeck(key)} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-orange-300 cursor-pointer transition-colors"><div className="flex justify-between"><h4 className="font-bold text-slate-900">{deck.title}</h4><PlusCircle size={16} className="text-slate-300"/></div><p className="text-xs text-slate-500">{deck.cards?.length} Cards</p></div>))}</div></div>
+            </div>
         )}
         {view === 'builder' && (
           <div className="h-full flex flex-col md:flex-row gap-6 animate-in fade-in duration-500">
             <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50"><div className="flex items-center gap-3"><h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText size={18} /> Creator</h3><div className="flex bg-slate-100 p-0.5 rounded-lg"><button onClick={() => setBuilderMode('lesson')} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'lesson' ? 'bg-white shadow-sm' : ''}`}>Lesson</button><button onClick={() => setBuilderMode('deck')} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'deck' ? 'bg-white shadow-sm' : ''}`}>Deck</button></div></div><button className="text-xs font-bold text-indigo-600 hover:underline" onClick={() => { setBuilderData({ title: '', subtitle: '', description: '', vocab: '', blocks: [] }); setEditingId(null); }}>Clear Form</button></div>
+              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50"><div className="flex items-center gap-3"><h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText size={18} /> Creator</h3><div className="flex bg-slate-100 p-0.5 rounded-lg"><button onClick={() => { setBuilderMode('lesson'); setEditingId(null); setBuilderData({ title: '', subtitle: '', description: '', vocab: '', blocks: [] }); }} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'lesson' ? 'bg-white shadow-sm' : ''}`}>Lesson</button><button onClick={() => { setBuilderMode('deck'); setEditingId('custom'); }} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'deck' ? 'bg-white shadow-sm' : ''}`}>Deck</button></div></div><button className="text-xs font-bold text-indigo-600 hover:underline" onClick={() => { setBuilderData({ title: '', subtitle: '', description: '', vocab: '', blocks: [] }); setEditingId(null); }}>Clear Form</button></div>
               <div className="flex-1 overflow-y-auto p-0">{builderMode === 'lesson' ? <LessonBuilderView data={builderData} setData={setBuilderData} onSave={handleSaveWithEdit} availableDecks={allDecks} /> : <CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} initialDeckId={editingId} />}</div>
             </div>
             {builderMode === 'lesson' && <div className="w-full md:w-[400px] bg-white rounded-[3rem] border-[8px] border-slate-900/10 shadow-xl overflow-hidden flex flex-col relative"><div className="flex-1 overflow-hidden bg-slate-50"><LessonView lesson={previewLesson} onFinish={() => alert("Preview Finished")} /></div><div className="bg-slate-100 p-2 text-center text-xs text-slate-400 font-bold uppercase tracking-wider border-t border-slate-200">Student Preview</div></div>}
@@ -1046,9 +1422,10 @@ const BuilderHub = ({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [mode, setMode] = useState('card'); 
   return (
-    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">{mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}{mode === 'card' && (<><div className="px-6 mt-2"><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button><button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button></div></div><CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} /></>)}{mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} />}</div>
+    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">{mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}{mode === 'card' && (<><div className="px-6 mt-2"><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button><button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button></div></div><CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} /></>)}{mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} availableDecks={allDecks} />}</div>
   );
 };
+
 
 // --- AUTH VIEW ---
 const AuthView = () => {
@@ -1088,7 +1465,6 @@ const AuthView = () => {
 // --- PROFILE VIEW ---
 const ProfileView = ({ user, userData }) => {
   const [deploying, setDeploying] = useState(false);
-  const [roleLoading, setRoleLoading] = useState(false);
   const handleLogout = () => signOut(auth);
   const deploySystemContent = async () => {
     setDeploying(true); const batch = writeBatch(db);
@@ -1100,10 +1476,10 @@ const ProfileView = ({ user, userData }) => {
   const toggleRole = async () => {
     if (!userData) return; 
     const newRole = userData.role === 'instructor' ? 'student' : 'instructor';
-    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }, { merge: true });
+    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole });
   };
   return (
-    <div className="h-full flex flex-col bg-slate-50"><Header title="Ego" subtitle="Profile" /><div className="flex-1 px-6 mt-4"><div className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col items-center mb-6"><h2 className="text-2xl font-bold">{userData?.name}</h2><p className="text-sm text-slate-500">{user.email}</p><div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase">{userData?.role}</div></div><div className="space-y-3"><button onClick={toggleRole} className="w-full bg-white p-4 rounded-xl border text-slate-700 font-bold mb-4 flex justify-between"><span>Switch Role</span><School size={20} /></button><button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border text-rose-600 font-bold mb-4 flex justify-between"><span>Sign Out</span><LogOut/></button><button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex justify-between">{deploying ? <Loader className="animate-spin"/> : <UploadCloud/>}<span>Deploy Content</span></button></div></div></div>
+    <div className="h-full flex flex-col bg-slate-50"><Header title="Ego" subtitle="Profile" /><div className="flex-1 px-6 mt-4"><div className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col items-center mb-6"><h2 className="text-2xl font-bold">{userData?.name}</h2><p className="text-sm text-slate-500">{user.email}</p><div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase">{userData?.role}</div></div><div className="space-y-3"><button onClick={toggleRole} className="w-full bg-white p-4 rounded-xl border text-slate-700 font-bold mb-4 flex justify-between"><span>Switch Role (Currently {userData?.role})</span><School size={20} /></button><button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border text-rose-600 font-bold mb-4 flex justify-between"><span>Sign Out</span><LogOut/></button><button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex justify-between">{deploying ? <Loader className="animate-spin"/> : <UploadCloud/>}<span>Deploy Content</span></button></div></div></div>
   );
 };
 
@@ -1127,8 +1503,8 @@ const StudentClassView = ({ classData, onBack, onSelectLesson, userData }) => {
               <h3 className="text-lg font-bold mb-1">Your Progress</h3>
               <p className="text-indigo-200 text-sm">Keep up the great work!</p>
               <div className="mt-4 flex gap-4">
-                 <div><span className="text-2xl font-bold block">{classData.assignments ? classData.assignments.filter(l => !completedSet.has(l.id)).length : 0}</span><span className="text-xs opacity-70">To Do</span></div>
-                 <div><span className="text-2xl font-bold block">{classData.students?.length || 0}</span><span className="text-xs opacity-70">Classmates</span></div>
+                <div><span className="text-2xl font-bold block">{classData.assignments ? classData.assignments.filter(l => !completedSet.has(l.id)).length : 0}</span><span className="text-xs opacity-70">To Do</span></div>
+                <div><span className="text-2xl font-bold block">{classData.students?.length || 0}</span><span className="text-xs opacity-70">Classmates</span></div>
               </div>
            </div>
 
@@ -1152,7 +1528,7 @@ const StudentClassView = ({ classData, onBack, onSelectLesson, userData }) => {
                )}
                {classData.assignments && classData.assignments.every(l => completedSet.has(l.id)) && classData.assignments.length > 0 && (
                   <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">All assignments completed! 🎉</div>
-               )}
+                )}
              </div>
            </div>
         </div>
@@ -1163,20 +1539,30 @@ const StudentClassView = ({ classData, onBack, onSelectLesson, userData }) => {
 
 // --- HOME VIEW ---
 const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass }) => {
+  const [activeStudentClass, setActiveStudentClass] = useState(null);
+  
   // Filter assignments to remove completed ones
   const completedSet = new Set(userData?.completedAssignments || []);
   const activeAssignments = (assignments || []).filter(l => !completedSet.has(l.id));
+
+  const handleSelectClass = (cls) => {
+    setActiveStudentClass(cls);
+  };
+  
+  if (activeStudentClass) {
+      return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={onSelectLesson} userData={userData} />;
+  }
 
   return (
   <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full">
     
     {/* MISSING INDEX ALERT */}
     {userData?.classSyncError && (
-       <div className="bg-rose-500 text-white p-4 text-center text-sm font-bold">
-           <AlertTriangle className="inline-block mr-2" size={16} />
-           System Notice: Database Index Missing.
-           <br/><span className="text-xs font-normal opacity-80">Instructors: Check console for the Firebase setup link.</span>
-       </div>
+        <div className="bg-rose-500 text-white p-4 text-center text-sm font-bold">
+            <AlertTriangle className="inline-block mr-2" size={16} />
+            System Notice: Database Index Missing.
+            <br/><span className="text-xs font-normal opacity-80">Instructors: Check console for the Firebase setup link.</span>
+        </div>
     )}
 
     <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." />
@@ -1191,13 +1577,13 @@ const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData, assignments
              {classes.map(cls => {
                const pendingCount = (cls.assignments || []).filter(l => !completedSet.has(l.id)).length;
                return (
-                 <button key={cls.id} onClick={() => onSelectClass(cls)} className="min-w-[200px] bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-left active:scale-95 transition-transform">
-                   <div className="flex items-center justify-between mb-2">
-                     <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">{cls.name.charAt(0)}</div>
-                     <span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{cls.code}</span>
-                   </div>
-                   <h4 className="font-bold text-slate-900">{cls.name}</h4>
-                   <p className="text-xs text-slate-500 mt-1">{pendingCount} Pending Tasks</p>
+                 <button key={cls.id} onClick={() => handleSelectClass(cls)} className="min-w-[200px] bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-left active:scale-95 transition-transform">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">{cls.name.charAt(0)}</div>
+                      <span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{cls.code}</span>
+                    </div>
+                    <h4 className="font-bold text-slate-900">{cls.name}</h4>
+                    <p className="text-xs text-slate-500 mt-1">{pendingCount} Pending Tasks</p>
                  </button>
                );
              })}
@@ -1367,7 +1753,7 @@ const LessonView = ({ lesson, onFinish }) => {
       <Header title="Lectio" subtitle={lesson.title} rightAction={<button onClick={() => onFinish(0)}><X size={24} className="text-slate-400" /></button>} />
       <div className="flex-1 px-6 mt-2 overflow-y-auto custom-scrollbar">
         <div className="flex gap-2 mb-8">
-           {[...Array(totalSteps)].map((_, i) => (<div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-500 ${i <= step ? 'bg-indigo-600' : 'bg-slate-200'}`} />))}
+          {[...Array(totalSteps)].map((_, i) => (<div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-500 ${i <= step ? 'bg-indigo-600' : 'bg-slate-200'}`} />))}
         </div>
         {renderContent()}
       </div>
@@ -1390,10 +1776,11 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) 
   const [xrayMode, setXrayMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [quickAddData, setQuickAddData] = useState({ front: '', back: '', type: 'noun' });
+  const [gameMode, setGameMode] = useState('study'); // 'study', 'match', 'vocabjack'
   
   const currentDeck = allDecks[selectedDeckKey];
-  const cards = currentDeck?.cards || [];
-  const card = cards[currentIndex];
+  const deckCards = currentDeck?.cards || [];
+  const card = deckCards[currentIndex];
   const theme = card ? (TYPE_COLORS[card.type] || TYPE_COLORS.noun) : TYPE_COLORS.noun;
 
   const handleDeckChange = (key) => {
@@ -1403,9 +1790,15 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) 
     setIsFlipped(false);
     setXrayMode(false);
     setManageMode(false);
+    setGameMode('study'); // Reset to study mode when changing deck
   };
 
-  const filteredCards = cards.filter(c => 
+  const handleGameEnd = (xp) => {
+      alert(`Game Over! You earned ${xp} XP.`);
+      setGameMode('study');
+  }
+
+  const filteredCards = deckCards.filter(c => 
     c.front.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.back.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -1426,14 +1819,45 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) 
     setSearchTerm(''); 
     alert("Card Added!");
   };
+  
+  // Game Mode Rendering
+  const renderGameMode = () => {
+      switch(gameMode) {
+          case 'match':
+              return <MatchingGame deckCards={deckCards} onGameEnd={handleGameEnd} />;
+          case 'vocabjack':
+              return <VocabJack deckCards={deckCards} onGameEnd={handleGameEnd} />;
+          case 'study':
+          default:
+              if (!card) return <div className="p-8 text-center text-slate-500">No cards in deck.</div>;
+              return (
+                  // Original Flashcard UI
+                  <div className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0">
+                      <div className={`relative w-full h-full max-h-[520px] transition-all duration-500 transform preserve-3d cursor-pointer shadow-2xl rounded-3xl ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => !xrayMode && setIsFlipped(!isFlipped)}>
+                          <div className="absolute inset-0 backface-hidden bg-white rounded-3xl border border-slate-100 overflow-hidden flex flex-col">
+                            <div className={`h-2 w-full ${xrayMode ? theme.bg.replace('50', '500') : 'bg-slate-100'} transition-colors duration-500`} />
+                            <div className="flex-1 flex flex-col p-6 relative">
+                              <div className="flex justify-between items-start mb-8"><span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${theme.bg} ${theme.text} border ${theme.border}`}>{card.type}</span></div>
+                              <div className="flex-1 flex flex-col items-center justify-center mt-[-40px]"><h2 className="text-4xl sm:text-5xl font-serif font-bold text-slate-900 text-center mb-4 leading-tight">{card.front}</h2><div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-full border border-slate-100"><button onClick={(e) => { e.stopPropagation(); }} className="p-2 bg-white rounded-full shadow-sm text-indigo-600 hover:scale-110 transition-transform active:scale-90"><Volume2 size={18} /></button><span className="font-mono text-slate-500 text-sm tracking-wide">{card.ipa}</span></div></div>
+                              <div className={`absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur-xl border-t border-slate-100 transition-all duration-500 ease-in-out flex flex-col overflow-hidden z-20 ${xrayMode ? 'h-[75%] opacity-100 rounded-t-3xl shadow-[-10px_-10px_30px_rgba(0,0,0,0.05)]' : 'h-0 opacity-0'}`}><div className="p-6 overflow-y-auto custom-scrollbar space-y-6"><div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Puzzle size={14} /> Morphologia</h4><div className="flex flex-wrap gap-2">{card.morphology && card.morphology.map((m, i) => (<div key={i} className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-lg p-2 min-w-[60px]"><span className={`font-bold text-lg ${m.type === 'root' ? 'text-indigo-600' : 'text-slate-700'}`}>{m.part}</span><span className="text-[9px] text-slate-400 font-medium uppercase mt-1 text-center max-w-[80px] leading-tight">{m.meaning}</span></div>))}</div></div><div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><MessageSquare size={14} /> Exemplum</h4><div className={`p-4 rounded-xl border ${theme.border} ${theme.bg}`}><p className="text-slate-800 font-serif font-medium text-lg mb-1">"{card.usage.sentence}"</p><p className={`text-sm ${theme.text} opacity-80 italic`}>{card.usage.translation}</p></div></div></div></div>
+                              {!xrayMode && (<div className="mt-auto text-center"><p className="text-xs text-slate-400 font-medium animate-pulse">Tap to flip</p></div>)}
+                            </div>
+                          </div>
+                          <div className="absolute inset-0 backface-hidden rotate-y-180 bg-slate-900 rounded-3xl shadow-xl flex flex-col items-center justify-center p-8 text-white relative overflow-hidden"><div className="relative z-10 flex flex-col items-center"><span className="text-indigo-300 text-xs font-bold uppercase tracking-widest mb-6 border-b border-indigo-500/30 pb-2">Translatio</span><h2 className="text-4xl font-bold text-center mb-8 leading-tight">{card.back}</h2></div></div>
+                      </div>
+                  </div>
+              );
+      }
+  }
 
-  if (!card && !manageMode) return <div className="h-full flex flex-col bg-slate-50"><Header title={currentDeck?.title || "Empty Deck"} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<button onClick={() => setManageMode(true)} className="p-2 bg-slate-100 rounded-full"><List size={20} className="text-slate-600" /></button>} /><div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400"><Layers size={48} className="mb-4 opacity-20" /><p>This deck is empty.</p><button onClick={() => setManageMode(true)} className="mt-4 text-indigo-600 font-bold text-sm">Add Cards</button></div></div>;
+  if (!card && deckCards.length > 0 && gameMode === 'study') return <div className="p-8 text-center text-slate-500">Deck finished! Restart from the first card.</div>;
+
 
   return (
     <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden">
       <Header 
         title={currentDeck?.title.split(' ')[1] || "Deck"} 
-        subtitle={`${currentIndex + 1} / ${cards.length}`} 
+        subtitle={`${currentIndex + 1} / ${deckCards.length}`} 
         onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} 
         rightAction={
           <div className="flex items-center gap-2">
@@ -1448,72 +1872,69 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard }) 
       {isSelectorOpen && <div className="absolute top-24 left-6 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 animate-in fade-in slide-in-from-top-4">{Object.entries(allDecks).map(([key, deck]) => (<button key={key} onClick={() => handleDeckChange(key)} className={`w-full text-left p-3 rounded-xl font-bold text-sm mb-1 ${selectedDeckKey === key ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}>{deck.title} <span className="float-right opacity-50">{deck.cards.length}</span></button>))}</div>}
       {isSelectorOpen && <div className="absolute inset-0 z-40 bg-black/5 backdrop-blur-[1px]" onClick={() => setIsSelectorOpen(false)} />}
 
-      {/* MANAGE MODE OVERLAY */}
-      {manageMode && (
-        <div className="absolute inset-0 top-[80px] bg-slate-50 z-30 flex flex-col animate-in slide-in-from-bottom-10 duration-300 p-6 overflow-y-auto pb-24">
-           <h3 className="font-bold text-slate-900 mb-4">Deck Manager</h3>
-           <div className="relative mb-6">
-             <Search className="absolute left-3 top-3.5 text-slate-400" size={18} />
-             <input 
-               value={searchTerm}
-               onChange={(e) => setSearchTerm(e.target.value)}
-               placeholder={`Search ${cards.length} cards...`}
-               className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm"
-             />
-           </div>
-           {selectedDeckKey === 'custom' && (
-             <div className="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm mb-6">
-               <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-3 flex items-center gap-2"><PlusCircle size={14}/> Quick Add</h4>
-               <div className="flex gap-2 mb-2">
-                 <input placeholder="Latin Word" value={quickAddData.front} onChange={(e) => setQuickAddData({...quickAddData, front: e.target.value})} className="flex-1 p-2 bg-slate-50 rounded border border-slate-200 text-sm font-bold" />
-                 <select value={quickAddData.type} onChange={(e) => setQuickAddData({...quickAddData, type: e.target.value})} className="p-2 bg-slate-50 rounded border border-slate-200 text-xs">
-                   <option value="noun">Noun</option><option value="verb">Verb</option><option value="phrase">Phrase</option>
-                 </select>
-               </div>
-               <div className="flex gap-2">
-                 <input placeholder="English Meaning" value={quickAddData.back} onChange={(e) => setQuickAddData({...quickAddData, back: e.target.value})} className="flex-1 p-2 bg-slate-50 rounded border border-slate-200 text-sm" />
-                 <button onClick={handleQuickAdd} className="bg-indigo-600 text-white p-2 rounded-lg"><Plus size={18}/></button>
-               </div>
-             </div>
-           )}
-           <div className="space-y-2">
-             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cards in Deck</p>
-             {filteredCards.map((c, idx) => (
-               <button key={idx} onClick={() => { setCurrentIndex(cards.indexOf(c)); setManageMode(false); }} className="w-full bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center hover:border-indigo-300 transition-colors text-left">
-                 <div><span className="font-bold text-slate-800">{c.front}</span><span className="text-slate-400 mx-2">•</span><span className="text-sm text-slate-500">{c.back}</span></div>
-                 <ArrowRight size={16} className="text-slate-300" />
-               </button>
-             ))}
-             {filteredCards.length === 0 && <p className="text-slate-400 text-sm italic">No cards found.</p>}
-           </div>
-        </div>
-      )}
-
-      {/* MAIN CARD AREA */}
-      {!manageMode && card && (
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0">
-        <div className={`relative w-full h-full max-h-[520px] transition-all duration-500 transform preserve-3d cursor-pointer shadow-2xl rounded-3xl ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => !xrayMode && setIsFlipped(!isFlipped)}>
-          <div className="absolute inset-0 backface-hidden bg-white rounded-3xl border border-slate-100 overflow-hidden flex flex-col">
-            <div className={`h-2 w-full ${xrayMode ? theme.bg.replace('50', '500') : 'bg-slate-100'} transition-colors duration-500`} />
-            <div className="flex-1 flex flex-col p-6 relative">
-              <div className="flex justify-between items-start mb-8"><span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${theme.bg} ${theme.text} border ${theme.border}`}>{card.type}</span></div>
-              <div className="flex-1 flex flex-col items-center justify-center mt-[-40px]"><h2 className="text-4xl sm:text-5xl font-serif font-bold text-slate-900 text-center mb-4 leading-tight">{card.front}</h2><div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-full border border-slate-100"><button onClick={(e) => { e.stopPropagation(); }} className="p-2 bg-white rounded-full shadow-sm text-indigo-600 hover:scale-110 transition-transform active:scale-90"><Volume2 size={18} /></button><span className="font-mono text-slate-500 text-sm tracking-wide">{card.ipa}</span></div></div>
-              <div className={`absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur-xl border-t border-slate-100 transition-all duration-500 ease-in-out flex flex-col overflow-hidden z-20 ${xrayMode ? 'h-[75%] opacity-100 rounded-t-3xl shadow-[-10px_-10px_30px_rgba(0,0,0,0.05)]' : 'h-0 opacity-0'}`}><div className="p-6 overflow-y-auto custom-scrollbar space-y-6"><div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Puzzle size={14} /> Morphologia</h4><div className="flex flex-wrap gap-2">{card.morphology && card.morphology.map((m, i) => (<div key={i} className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-lg p-2 min-w-[60px]"><span className={`font-bold text-lg ${m.type === 'root' ? 'text-indigo-600' : 'text-slate-700'}`}>{m.part}</span><span className="text-[9px] text-slate-400 font-medium uppercase mt-1 text-center max-w-[80px] leading-tight">{m.meaning}</span></div>))}</div></div><div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><MessageSquare size={14} /> Exemplum</h4><div className={`p-4 rounded-xl border ${theme.border} ${theme.bg}`}><p className="text-slate-800 font-serif font-medium text-lg mb-1">"{card.usage.sentence}"</p><p className={`text-sm ${theme.text} opacity-80 italic`}>{card.usage.translation}</p></div></div></div></div>
-              {!xrayMode && (<div className="mt-auto text-center"><p className="text-xs text-slate-400 font-medium animate-pulse">Tap to flip</p></div>)}
-            </div>
+      {/* TABS FOR STUDY/GAMES */}
+      <div className="px-6 mt-4">
+          <div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto">
+              <button onClick={() => setGameMode('study')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg ${gameMode === 'study' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Study</button>
+              <button onClick={() => setGameMode('match')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg ${gameMode !== 'study' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Games</button>
           </div>
-          <div className="absolute inset-0 backface-hidden rotate-y-180 bg-slate-900 rounded-3xl shadow-xl flex flex-col items-center justify-center p-8 text-white relative overflow-hidden"><div className="relative z-10 flex flex-col items-center"><span className="text-indigo-300 text-xs font-bold uppercase tracking-widest mb-6 border-b border-indigo-500/30 pb-2">Translatio</span><h2 className="text-4xl font-bold text-center mb-8 leading-tight">{card.back}</h2></div></div>
-        </div>
       </div>
-      )}
 
-      <div className="px-6 pb-4">
-        <div className="flex items-center justify-between max-w-sm mx-auto">
-          <button onClick={() => { setXrayMode(false); setIsFlipped(false); setTimeout(() => setCurrentIndex((prev) => (prev - 1 + cards.length) % cards.length), 200); }} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-rose-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all"><X size={28} strokeWidth={2.5} /></button>
-          <button onClick={(e) => { e.stopPropagation(); if(isFlipped) setIsFlipped(false); setXrayMode(!xrayMode); }} className={`h-20 w-20 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all duration-300 border-2 ${xrayMode ? 'bg-indigo-600 border-indigo-600 text-white translate-y-[-8px] shadow-indigo-200' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}><Search size={28} strokeWidth={xrayMode ? 3 : 2} className={xrayMode ? 'animate-pulse' : ''} /><span className="text-[10px] font-black tracking-wider mt-1">X-RAY</span></button>
-          <button onClick={() => { setXrayMode(false); setIsFlipped(false); setTimeout(() => setCurrentIndex((prev) => (prev + 1) % cards.length), 200); }} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-emerald-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all"><Check size={28} strokeWidth={2.5} /></button>
-        </div>
+
+      {/* MAIN CONTENT AREA */}
+      <div className="flex-1 overflow-y-auto pt-4">
+        {manageMode ? (
+            <div className="p-6">
+                 <h3 className="font-bold text-slate-900 mb-4">Deck Manager</h3>
+                 {/* Quick Add (Only for Custom Deck) */}
+                 {selectedDeckKey === 'custom' && (
+                   <div className="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm mb-6">
+                     <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-3 flex items-center gap-2"><PlusCircle size={14}/> Quick Add</h4>
+                     <div className="flex gap-2 mb-2">
+                       <input placeholder="Latin Word" value={quickAddData.front} onChange={(e) => setQuickAddData({...quickAddData, front: e.target.value})} className="flex-1 p-2 bg-slate-50 rounded border border-slate-200 text-sm font-bold" />
+                       <select value={quickAddData.type} onChange={(e) => setQuickAddData({...quickAddData, type: e.target.value})} className="p-2 bg-slate-50 rounded border border-slate-200 text-xs">
+                         <option value="noun">Noun</option><option value="verb">Verb</option><option value="phrase">Phrase</option>
+                       </select>
+                     </div>
+                     <div className="flex gap-2">
+                       <input placeholder="English Meaning" value={quickAddData.back} onChange={(e) => setQuickAddData({...quickAddData, back: e.target.value})} className="flex-1 p-2 bg-slate-50 rounded border border-slate-200 text-sm" />
+                       <button onClick={handleQuickAdd} className="bg-indigo-600 text-white p-2 rounded-lg"><Plus size={18}/></button>
+                     </div>
+                   </div>
+                 )}
+                 <div className="space-y-2">
+                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cards in Deck</p>
+                   {filteredCards.map((c, idx) => (
+                     <button key={idx} onClick={() => { setCurrentIndex(deckCards.indexOf(c)); setManageMode(false); }} className="w-full bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center hover:border-indigo-300 transition-colors text-left">
+                       <div><span className="font-bold text-slate-800">{c.front}</span><span className="text-slate-400 mx-2">•</span><span className="text-sm text-slate-500">{c.back}</span></div>
+                       <ArrowRight size={16} className="text-slate-300" />
+                     </button>
+                   ))}
+                   {filteredCards.length === 0 && <p className="text-slate-400 text-sm italic">No cards found.</p>}
+                 </div>
+            </div>
+        ) : (
+            <>
+            {gameMode === 'study' && renderGameMode()}
+            {gameMode !== 'study' && (
+                <div className="px-6">
+                    <VocabGames deckCards={deckCards} onGameEnd={handleGameEnd} />
+                </div>
+            )}
+            </>
+        )}
       </div>
+
+      {/* NAVIGATOR (Study Mode Only) */}
+      {gameMode === 'study' && !manageMode && card && (
+        <div className="px-6 pb-4">
+          <div className="flex items-center justify-between max-w-sm mx-auto">
+            <button onClick={() => { setXrayMode(false); setIsFlipped(false); setTimeout(() => setCurrentIndex((prev) => (prev - 1 + deckCards.length) % deckCards.length), 200); }} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-rose-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all"><X size={28} strokeWidth={2.5} /></button>
+            <button onClick={(e) => { e.stopPropagation(); if(isFlipped) setIsFlipped(false); setXrayMode(!xrayMode); }} className={`h-20 w-20 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all duration-300 border-2 ${xrayMode ? 'bg-indigo-600 border-indigo-600 text-white translate-y-[-8px] shadow-indigo-200' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}><Search size={28} strokeWidth={xrayMode ? 3 : 2} className={xrayMode ? 'animate-pulse' : ''} /><span className="text-[10px] font-black tracking-wider mt-1">X-RAY</span></button>
+            <button onClick={() => { setXrayMode(false); setIsFlipped(false); setTimeout(() => setCurrentIndex((prev) => (prev + 1) % deckCards.length), 200); }} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-emerald-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all"><Check size={28} strokeWidth={2.5} /></button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1534,37 +1955,31 @@ const App = () => {
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
   const [enrolledClasses, setEnrolledClasses] = useState([]);
   const [classLessons, setClassLessons] = useState([]);
+  const [activeStudentClass, setActiveStudentClass] = useState(null); // Used to display class view
 
   // Derived Data: MERGE custom cards into system decks if they belong there, or keep them in 'custom'
-  const allDecks = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
-  
-  // Ensure custom deck exists in derived state
-  if (!allDecks.custom) allDecks.custom = { title: "✍️ Scriptorium", cards: [] };
+  const allDecks = useMemo(() => {
+    const decks = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
 
-  // Distribute Custom Cards
-  customCards.forEach(card => {
-      const target = card.deckId || 'custom';
-      if (allDecks[target]) {
-          if (!allDecks[target].cards) allDecks[target].cards = [];
-          allDecks[target].cards.push(card);
-      } else {
-          // If target deck doesn't exist in system decks (e.g. new custom deck), create it on fly for view
-          if (!allDecks[target] && target.startsWith('custom_')) {
-             // We need title from somewhere, usually stored in card or separate deck collection. 
-             // For simplicity, we use the ID or look for a title property if we saved one.
-             allDecks[target] = { title: card.deckTitle || "Custom Deck", cards: [] };
-          }
-          if (allDecks[target]) allDecks[target].cards.push(card);
-          else allDecks.custom.cards.push(card);
-      }
-  });
+    customCards.forEach(card => {
+        const target = card.deckId || 'custom';
+        if (!decks[target]) {
+            // Create a new custom deck structure if it doesn't exist
+            decks[target] = { title: card.deckTitle || "Custom Deck", cards: [] };
+        }
+        if (!decks[target].cards) decks[target].cards = [];
+        decks[target].cards.push(card);
+    });
+    return decks;
+  }, [systemDecks, customCards]);
 
-  const lessons = [...systemLessons, ...customLessons, ...classLessons];
+  const lessons = useMemo(() => [...systemLessons, ...customLessons, ...classLessons], [systemLessons, customLessons, classLessons]);
 
   useEffect(() => { const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); }); return () => unsubscribe(); }, []);
   
   useEffect(() => {
     if (!user) { setUserData(null); return; }
+    
     // Always load system decks first to ensure content is available
     setSystemDecks(INITIAL_SYSTEM_DECKS);
     setSystemLessons(INITIAL_SYSTEM_LESSONS);
@@ -1580,20 +1995,16 @@ const App = () => {
     const unsubClasses = onSnapshot(qEnrolled, (snapshot) => {
         const cls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setEnrolledClasses(cls);
-        // Extract assignments
         const newAssignments = [];
         cls.forEach(c => {
             if (c.assignments && Array.isArray(c.assignments)) {
                 newAssignments.push(...c.assignments);
             }
         });
-        // Dedup by ID if needed, but simple push is fine for now
         setClassLessons(newAssignments);
-        // Update user profile local state for UI
         setUserData(prev => ({...prev, classAssignments: newAssignments}));
     }, (error) => {
         console.log("Class sync error (likely needs index):", error);
-        // Optionally flag user data to show alert
         setUserData(prev => ({...prev, classSyncError: true}));
     });
 
@@ -1601,30 +2012,36 @@ const App = () => {
   }, [user]);
 
   // CRUD HANDLERS
-  const handleCreateCard = async (c) => { if(!user) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), c); setSelectedDeckKey(c.deckId || 'custom'); setActiveTab('flashcards'); };
+  const handleCreateCard = useCallback(async (c) => { 
+    if(!user) return; 
+    const cardId = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards')).id; // Pre-generate ID
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), {...c, id: cardId}); 
+    setSelectedDeckKey(c.deckId || 'custom'); 
+    setActiveTab('flashcards'); 
+  }, [user]);
   
-  const handleUpdateCard = async (cardId, data) => {
+  const handleUpdateCard = useCallback(async (cardId, data) => {
     if (!user) return;
-    // Check if this is a custom card (system cards don't have firestore IDs in custom_cards collection usually)
     try {
        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), data);
     } catch (e) {
        console.error(e);
-       alert("Cannot edit system cards directly. Clone to custom deck to edit.");
+       alert("Cannot edit card. Check if it's a system card.");
     }
-  };
+  }, [user]);
 
-  const handleDeleteCard = async (cardId) => {
+  const handleDeleteCard = useCallback(async (cardId) => {
     if (!user) return;
+    if (!window.confirm("Are you sure you want to delete this card?")) return;
     try {
        await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId));
     } catch (e) {
        console.error(e);
-       alert("Cannot delete system cards.");
+       alert("Failed to delete card.");
     }
-  };
+  }, [user]);
 
-  const handleCreateLesson = async (l, id = null) => { 
+  const handleCreateLesson = useCallback(async (l, id = null) => { 
       if(!user) return; 
       if (id) {
           await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id), l);
@@ -1632,9 +2049,9 @@ const App = () => {
           await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), l); 
       }
       setActiveTab('home'); 
-  };
+  }, [user]);
   
-  const handleFinishLesson = async (lessonId, xp) => { 
+  const handleFinishLesson = useCallback(async (lessonId, xp) => { 
     setActiveTab('home'); 
     if (xp > 0 && user) { 
       try { 
@@ -1650,14 +2067,21 @@ const App = () => {
         }, { merge: true }); 
       } 
     } 
-  };
+  }, [user]);
 
   if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
   if (!user) return <AuthView />;
   if (!userData) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>; 
   
   // Using the unified logic, passing handlers down
-  if (userData.role === 'instructor') return <InstructorDashboard user={user} userData={userData} allDecks={allDecks} lessons={lessons} onSaveLesson={handleCreateLesson} onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onLogout={() => signOut(auth)} />;
+  const commonHandlers = {
+      onSaveCard: handleCreateCard,
+      onUpdateCard: handleUpdateCard,
+      onDeleteCard: handleDeleteCard,
+      onSaveLesson: handleCreateLesson,
+  };
+
+  if (userData.role === 'instructor') return <InstructorDashboard user={user} userData={userData} allDecks={allDecks} lessons={lessons} {...commonHandlers} onLogout={() => signOut(auth)} />;
 
   const renderStudentView = () => {
     switch (activeTab) {
@@ -1674,7 +2098,11 @@ const App = () => {
     <div className="bg-slate-100 min-h-screen font-sans text-slate-900 flex justify-center items-center p-0 sm:p-4">
       <div className={`bg-slate-50 w-full h-[100dvh] shadow-2xl relative overflow-hidden border-[8px] border-slate-900/5 sm:border-slate-900/10 ${userData?.role === 'instructor' ? 'max-w-full sm:rounded-none border-0' : 'max-w-[400px] sm:rounded-[3rem] sm:h-[800px]'}`}>
         {userData?.role !== 'instructor' && <div className="absolute top-0 left-0 right-0 h-8 bg-white/0 z-50 pointer-events-none" />}
-        {renderStudentView()}
+        {activeStudentClass ? (
+            <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={(l) => { setActiveLesson(l); setActiveTab('lesson'); }} userData={userData} />
+        ) : (
+             renderStudentView()
+        )}
         <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
       </div>
       <style>{` .perspective-1000 { perspective: 1000px; } .preserve-3d { transform-style: preserve-3d; } .backface-hidden { backface-visibility: hidden; } .rotate-y-180 { transform: rotateY(180deg); } .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; } `}</style>
