@@ -1382,7 +1382,7 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
         {view === 'builder' && (
           <div className="h-full flex flex-col md:flex-row gap-6 animate-in fade-in duration-500">
             <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50"><div className="flex items-center gap-3"><h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText size={18} /> Creator</h3><div className="flex bg-slate-100 p-0.5 rounded-lg"><button onClick={() => setBuilderMode('lesson')} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'lesson' ? 'bg-white shadow-sm' : ''}`}>Lesson</button><button onClick={() => setBuilderMode('deck')} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'deck' ? 'bg-white shadow-sm' : ''}`}>Deck</button></div></div><button className="text-xs font-bold text-indigo-600 hover:underline" onClick={() => setBuilderData({ title: '', subtitle: '', description: '', vocab: '', blocks: [] })}>Clear Form</button></div>
+              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50"><div className="flex items-center gap-3"><h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText size={18} /> Creator</h3><div className="flex bg-slate-100 p-0.5 rounded-lg"><button onClick={() => { setBuilderMode('lesson'); setEditingId(null); setBuilderData({ title: '', subtitle: '', description: '', vocab: '', blocks: [] }); }} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'lesson' ? 'bg-white shadow-sm' : ''}`}>Lesson</button><button onClick={() => { setBuilderMode('deck'); setEditingId('custom'); }} className={`px-3 py-1 text-xs font-bold rounded-md ${builderMode === 'deck' ? 'bg-white shadow-sm' : ''}`}>Deck</button></div></div><button className="text-xs font-bold text-indigo-600 hover:underline" onClick={() => { setBuilderData({ title: '', subtitle: '', description: '', vocab: '', blocks: [] }); setEditingId(null); }}>Clear Form</button></div>
               <div className="flex-1 overflow-y-auto p-0">{builderMode === 'lesson' ? <LessonBuilderView data={builderData} setData={setBuilderData} onSave={handleSaveWithEdit} availableDecks={allDecks} /> : <CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} initialDeckId={editingId} />}</div>
             </div>
             {builderMode === 'lesson' && <div className="w-full md:w-[400px] bg-white rounded-[3rem] border-[8px] border-slate-900/10 shadow-xl overflow-hidden flex flex-col relative"><div className="flex-1 overflow-hidden bg-slate-50"><LessonView lesson={previewLesson} onFinish={() => alert("Preview Finished")} /></div><div className="bg-slate-100 p-2 text-center text-xs text-slate-400 font-bold uppercase tracking-wider border-t border-slate-200">Student Preview</div></div>}
@@ -1945,7 +1945,7 @@ const App = () => {
   const [classLessons, setClassLessons] = useState([]);
   const [activeStudentClass, setActiveStudentClass] = useState(null);
 
-  // Derived Data
+  // Derived Data: MERGE custom cards into system decks if they belong there, or keep them in 'custom'
   const allDecks = useMemo(() => {
     const decks = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
     customCards.forEach(card => {
@@ -1966,13 +1966,17 @@ const App = () => {
   useEffect(() => {
     if (!user) { setUserData(null); return; }
     
+    // Always load system decks first to ensure content is available
     setSystemDecks(INITIAL_SYSTEM_DECKS);
     setSystemLessons(INITIAL_SYSTEM_LESSONS);
 
     const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => { if (docSnap.exists()) setUserData(docSnap.data()); else setUserData(DEFAULT_USER_DATA); });
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => { const d = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); }); if (Object.keys(d).length === 0) setSystemDecks(INITIAL_SYSTEM_DECKS); else setSystemDecks(d); });
+    const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => { const l = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (l.length === 0) setSystemLessons(INITIAL_SYSTEM_LESSONS); else setSystemLessons(l); });
     
+    // Enrolled Classes Listener
     const qEnrolled = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
     const unsubClasses = onSnapshot(qEnrolled, (snapshot) => {
         const cls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -1986,7 +1990,7 @@ const App = () => {
         setClassLessons(newAssignments);
         setUserData(prev => ({...prev, classAssignments: newAssignments}));
     }, (error) => {
-        console.log("Class sync error:", error);
+        console.log("Class sync error (likely needs index):", error);
         setUserData(prev => ({...prev, classSyncError: true}));
     });
 
