@@ -81,7 +81,6 @@ import {
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
-// Note: In a real production app, use environment variables for keys.
 const firebaseConfig = {
   apiKey: "AIzaSyAjK79x_N5pSWzWluFUg25mqEc_HeraRPk",
   authDomain: "epic-latin.firebaseapp.com",
@@ -167,9 +166,7 @@ const TYPE_COLORS: any = {
   adjective: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' }
 };
 
-// --- SHARED COMPONENTS ---
-
-const Toast = ({ message, onClose }: any) => {
+function Toast({ message, onClose }: any) {
   useEffect(() => {
     const timer = setTimeout(onClose, 3000);
     return () => clearTimeout(timer);
@@ -181,9 +178,9 @@ const Toast = ({ message, onClose }: any) => {
       <span className="text-sm font-medium tracking-wide">{message}</span>
     </div>
   );
-};
+}
 
-const Navigation = ({ activeTab, setActiveTab }: any) => {
+function Navigation({ activeTab, setActiveTab }: any) {
   const tabs = [
     { id: 'home', icon: Home, label: 'Domus' },
     { id: 'flashcards', icon: Layers, label: 'Chartae' },
@@ -200,21 +197,23 @@ const Navigation = ({ activeTab, setActiveTab }: any) => {
       ))}
     </div>
   );
-};
+}
 
-const Header = ({ title, subtitle, rightAction, onClickTitle }: any) => (
-  <div className="px-6 pt-12 pb-6 bg-white sticky top-0 z-40 border-b border-slate-100 flex justify-between items-end">
-    <div onClick={onClickTitle} className={onClickTitle ? "cursor-pointer active:opacity-60 transition-opacity" : ""}>
-      <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">{title} {onClickTitle && <ChevronDown size={20} className="text-slate-400" />}</h1>
-      {subtitle && <p className="text-sm text-slate-500 mt-1 font-medium">{subtitle}</p>}
+function Header({ title, subtitle, rightAction, onClickTitle }: any) {
+  return (
+    <div className="px-6 pt-12 pb-6 bg-white sticky top-0 z-40 border-b border-slate-100 flex justify-between items-end">
+        <div onClick={onClickTitle} className={onClickTitle ? "cursor-pointer active:opacity-60 transition-opacity" : ""}>
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">{title} {onClickTitle && <ChevronDown size={20} className="text-slate-400" />}</h1>
+        {subtitle && <p className="text-sm text-slate-500 mt-1 font-medium">{subtitle}</p>}
+        </div>
+        {rightAction}
     </div>
-    {rightAction}
-  </div>
-);
+  );
+}
 
 // --- GAME COMPONENTS ---
 
-const MatchingGame = ({ deckCards, onGameEnd }: any) => {
+function MatchingGame({ deckCards, onGameEnd }: any) {
     const [cards, setCards] = useState<any[]>([]);
     const [flippedIndices, setFlippedIndices] = useState<number[]>([]);
     const [matchedIndices, setMatchedIndices] = useState<number[]>([]);
@@ -307,9 +306,9 @@ const MatchingGame = ({ deckCards, onGameEnd }: any) => {
             )}
         </div>
     );
-};
+}
 
-const VocabJack = ({ deckCards, onGameEnd }: any) => {
+function VocabJack({ deckCards, onGameEnd }: any) {
     const [playerHand, setPlayerHand] = useState<any[]>([]);
     const [dealerHand, setDealerHand] = useState<any[]>([]);
     const [gameState, setGameState] = useState('start'); 
@@ -454,10 +453,10 @@ const VocabJack = ({ deckCards, onGameEnd }: any) => {
             )}
         </div>
     );
-};
+}
 
 // --- FLASHCARD VIEW ---
-const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride }: any) => {
+function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride }: any) {
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [manageMode, setManageMode] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -632,11 +631,11 @@ const FlashcardView = ({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
       )}
     </div>
   );
-};
+}
 
 // --- REST OF THE COMPONENTS (CardBuilder, LessonBuilder, etc.) ---
 
-const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId }: any) => {
+function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId }: any) {
   const [formData, setFormData] = useState({
     front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', deckId: initialDeckId || 'custom'
   });
@@ -800,9 +799,9 @@ const CardBuilderView = ({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
       )}
     </div>
   );
-};
+}
 
-const LessonBuilderView = ({ data, setData, onSave, availableDecks }: any) => {
+function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const updateBlock = (index: number, field: string, value: any) => { const newBlocks = [...(data.blocks || [])]; newBlocks[index] = { ...newBlocks[index], [field]: value }; setData({ ...data, blocks: newBlocks }); };
   const updateDialogueLine = (blockIndex: number, lineIndex: number, field: string, value: any) => { const newBlocks = [...(data.blocks || [])]; newBlocks[blockIndex].lines[lineIndex][field] = value; setData({ ...data, blocks: newBlocks }); };
@@ -835,10 +834,10 @@ const LessonBuilderView = ({ data, setData, onSave, availableDecks }: any) => {
       <div className="pt-4 border-t border-slate-100"><button onClick={handleSave} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform"><Save size={20} /> Save Lesson to Library</button></div>
     </div>
   );
-};
+}
 
 // --- INSTRUCTOR COMPONENTS ---
-const ClassManagerView = ({ user, lessons, allDecks }: any) => {
+function ClassManagerView({ user, lessons, allDecks }: any) {
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [newClassName, setNewClassName] = useState('');
@@ -905,9 +904,9 @@ const ClassManagerView = ({ user, lessons, allDecks }: any) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{classes.map(cls => (<div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group"><div className="absolute top-4 right-4 flex gap-2"><button onClick={(e) => {e.stopPropagation(); handleRenameClass(cls.id, cls.name);}} className="text-slate-300 hover:text-indigo-500"><Edit3 size={16}/></button><button onClick={(e) => {e.stopPropagation(); handleDeleteClass(cls.id);}} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div><div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div><h3 className="font-bold text-lg text-slate-900">{cls.name}</h3><p className="text-sm text-slate-500 mb-4">{(cls.students || []).length} Students</p><div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg"><span className="text-xs font-mono font-bold text-slate-600 tracking-wider">{cls.code}</span><button className="text-indigo-600 text-xs font-bold flex items-center gap-1" onClick={(e) => {e.stopPropagation(); navigator.clipboard.writeText(cls.code);}}><Copy size={12}/> Copy</button></div></div>))}</div>
     </div>
   );
-};
+}
 
-const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, onSaveCard, onUpdateCard, onDeleteCard, onLogout }: any) => {
+function InstructorDashboard({ user, userData, allDecks, lessons, onSaveLesson, onSaveCard, onUpdateCard, onDeleteCard, onLogout }: any) {
   const [view, setView] = useState('dashboard');
   const [builderData, setBuilderData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [builderMode, setBuilderMode] = useState('lesson');
@@ -965,17 +964,17 @@ const InstructorDashboard = ({ user, userData, allDecks, lessons, onSaveLesson, 
       </div>
     </div>
   );
-};
+}
 
-const BuilderHub = ({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks }: any) => {
+function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks }: any) {
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [mode, setMode] = useState('card'); 
   return (
     <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">{mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}{mode === 'card' && (<><div className="px-6 mt-2"><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button><button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button></div></div><CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} /></>)}{mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} />}</div>
   );
-};
+}
 
-const AuthView = () => {
+function AuthView() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -1007,9 +1006,9 @@ const AuthView = () => {
       </div>
     </div>
   );
-};
+}
 
-const ProfileView = ({ user, userData }: any) => {
+function ProfileView({ user, userData }: any) {
   const [deploying, setDeploying] = useState(false);
   const handleLogout = () => signOut(auth);
   const deploySystemContent = async () => {
@@ -1027,9 +1026,9 @@ const ProfileView = ({ user, userData }: any) => {
   return (
     <div className="h-full flex flex-col bg-slate-50"><Header title="Ego" subtitle="Profile" /><div className="flex-1 px-6 mt-4"><div className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col items-center mb-6"><h2 className="text-2xl font-bold">{userData?.name}</h2><p className="text-sm text-slate-500">{user.email}</p><div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase">{userData?.role}</div></div><div className="space-y-3"><button onClick={toggleRole} className="w-full bg-white p-4 rounded-xl border text-slate-700 font-bold mb-4 flex justify-between"><span>Switch Role</span><School size={20} /></button><button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border text-rose-600 font-bold mb-4 flex justify-between"><span>Sign Out</span><LogOut/></button><button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex justify-between">{deploying ? <Loader className="animate-spin"/> : <UploadCloud/>}<span>Deploy Content</span></button></div></div></div>
   );
-};
+}
 
-const StudentClassView = ({ classData, onBack, onSelectLesson, onSelectDeck, userData }: any) => {
+function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, userData }: any) {
   const completedSet = new Set(userData?.completedAssignments || []);
   const handleAssignmentClick = (assignment: any) => { if (assignment.contentType === 'deck') { onSelectDeck(assignment); } else { onSelectLesson(assignment); } };
   return (
@@ -1038,9 +1037,9 @@ const StudentClassView = ({ classData, onBack, onSelectLesson, onSelectDeck, use
       <div className="flex-1 px-6 mt-4 overflow-y-auto pb-24"><div className="space-y-6"><div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg"><h3 className="text-lg font-bold mb-1">Your Progress</h3><p className="text-indigo-200 text-sm">Keep up the great work!</p><div className="mt-4 flex gap-4"><div><span className="text-2xl font-bold block">{classData.assignments ? classData.assignments.filter((l: any) => !completedSet.has(l.id)).length : 0}</span><span className="text-xs opacity-70">To Do</span></div><div><span className="text-2xl font-bold block">{classData.students?.length || 0}</span><span className="text-xs opacity-70">Classmates</span></div></div></div><div><h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3><div className="space-y-3">{classData.assignments && classData.assignments.length > 0 ? ( classData.assignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all"><div className="flex items-center space-x-4"><div className={`h-10 w-10 rounded-xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-600'}`}>{l.contentType === 'deck' ? <Layers size={20}/> : <PlayCircle size={20} />}</div><div className="text-left"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-indigo-600/70">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p></div></div><ChevronRight size={20} className="text-slate-300" /></button> )) ) : ( <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No pending assignments.</div> )}{classData.assignments && classData.assignments.every((l: any) => completedSet.has(l.id)) && classData.assignments.length > 0 && (<div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">All assignments completed! 🎉</div>)}</div></div></div></div>
     </div>
   );
-};
+}
 
-const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck }: any) => {
+function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const completedSet = new Set(userData?.completedAssignments || []);
   const activeAssignments = (assignments || []).filter((l: any) => !completedSet.has(l.id));
@@ -1062,7 +1061,7 @@ const HomeView = ({ setActiveTab, lessons, onSelectLesson, userData, assignments
   </div>
 )};
 
-const LessonView = ({ lesson, onFinish }: any) => {
+function LessonView({ lesson, onFinish }: any) {
   const [step, setStep] = useState(0); 
   const [quizSelection, setQuizSelection] = useState<string | null>(null);
   if (!lesson) return null;
@@ -1084,10 +1083,10 @@ const LessonView = ({ lesson, onFinish }: any) => {
   return (
     <div className="pb-24 min-h-full flex flex-col bg-slate-50"><Header title="Lectio" subtitle={lesson.title} rightAction={<button onClick={() => onFinish(0)}><X size={24} className="text-slate-400" /></button>} /><div className="flex-1 px-6 mt-2 overflow-y-auto custom-scrollbar"><div className="flex gap-2 mb-8">{[...Array(totalSteps)].map((_, i) => (<div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-500 ${i <= step ? 'bg-indigo-600' : 'bg-slate-200'}`} />))}</div>{renderContent()}</div>{step < totalSteps - 1 && (<div className="p-6 bg-white border-t border-slate-100 sticky bottom-0 z-30 pb-safe"><button onClick={() => { setQuizSelection(null); setStep(step + 1); }} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2">Continue <ChevronRight size={20} /></button></div>)}</div>
   );
-};
+}
 
 // --- MAIN APP COMPONENT ---
-const App = () => {
+function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
@@ -1187,6 +1186,6 @@ const App = () => {
       <style>{` .perspective-1000 { perspective: 1000px; } .preserve-3d { transform-style: preserve-3d; } .backface-hidden { backface-visibility: hidden; } .rotate-y-180 { transform: rotateY(180deg); } .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; } `}</style>
     </div>
   );
-};
+}
 
 export default App;
